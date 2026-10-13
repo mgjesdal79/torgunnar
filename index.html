@@ -4,8 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0c0d12">
 <title>PandaCoins</title>
 <link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="favicon.png">
 <style>
   :root{
     --bg:#13141a; --surface:#1e2029; --surface2:#262935; --line:#323545;
@@ -75,6 +78,13 @@
 <script type="module">
   window.APP_VERSION = '1';
   import('./js/app.js?cb=' + window.APP_VERSION);
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function () {});
+    });
+  }
 </script>
 </body>
 </html>
