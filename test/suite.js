@@ -1,4 +1,4 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge } from '../js/logic.js';
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog } from '../js/logic.js';
 
 export function runTests() {
   const results = [];
@@ -215,6 +215,49 @@ export function runTests() {
     s = addItem(s, { text: 'a', type: 'task', category: 'jobb' }, { now, id: 'a' });
     s.items[0].done = true;
     eq(categoryBadge(s, 'jobb', now).count, 0);
+  });
+
+  t('mergeState: items LWW per id på updatedAt', () => {
+    const now = '2026-10-13T08:00:00Z';
+    let a = addItem(defaultState(), { text: 'gammel' }, { now, id: 'x' });
+    let b = clone(a);
+    a.items[0].text = 'A'; a.items[0].updatedAt = '2026-10-13T09:00:00Z';
+    b.items[0].text = 'B'; b.items[0].updatedAt = '2026-10-13T10:00:00Z';
+    const m = mergeState(a, b);
+    eq(m.items[0].text, 'B');
+  });
+  t('mergeState: tombstone vinner når nyest', () => {
+    const now = '2026-10-13T08:00:00Z';
+    let a = addItem(defaultState(), { text: 'x' }, { now, id: 'x' });
+    let b = clone(a);
+    b.items[0].removed = true; b.items[0].updatedAt = '2026-10-13T11:00:00Z';
+    const m = mergeState(a, b);
+    eq(m.items[0].removed, true);
+  });
+  t('mergeState: nye items fra begge kommer med', () => {
+    const now = '2026-10-13T08:00:00Z';
+    let a = addItem(defaultState(), { text: 'a' }, { now, id: 'a' });
+    let b = addItem(defaultState(), { text: 'b' }, { now, id: 'b' });
+    const m = mergeState(a, b);
+    eq(m.items.map((i) => i.id).sort(), ['a', 'b']);
+  });
+  t('mergeState: settings LWW på updatedAt', () => {
+    let a = defaultState(); let b = defaultState();
+    a.settings.shortcutName = 'A'; a.settings.updatedAt = '2026-10-13T09:00:00Z';
+    b.settings.shortcutName = 'B'; b.settings.updatedAt = '2026-10-13T10:00:00Z';
+    eq(mergeState(a, b).settings.shortcutName, 'B');
+  });
+  t('mergeState: log union-by-id', () => {
+    const now = '2026-10-13T08:00:00Z';
+    let a = addItem(defaultState(), { text: 'a' }, { now, id: 'a' });
+    let b = addItem(defaultState(), { text: 'b' }, { now, id: 'b' });
+    eq(mergeState(a, b).log.length, 2);
+  });
+  t('pruneLog beholder nyeste N', () => {
+    let s = defaultState();
+    for (let i = 0; i < 10; i++) s.log.push({ id: 'e' + i, at: '2026-10-13T0' + i + ':00:00Z' });
+    const p = pruneLog(s, 3);
+    eq(p.log.length, 3); eq(p.log[2].id, 'e9');
   });
 
   return results;

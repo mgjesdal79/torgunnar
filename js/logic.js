@@ -31,6 +31,7 @@ export function migrate(state, today) {
   if (!Array.isArray(out.items)) out.items = [];
   if (!out.checkRuns || typeof out.checkRuns !== 'object') out.checkRuns = {};
   if (!Array.isArray(out.log)) out.log = [];
+  out.log = out.log.slice(-LOG_KEEP);
   return out;
 }
 
@@ -200,4 +201,48 @@ export function categoryBadge(state, catId, now) {
   const open = categoryItems(state, catId).filter((i) => isPending(i, now));
   const hot = open.some((i) => (i.due && dayOf(i.due) <= today) || (i.remindAt && i.remindAt <= now));
   return { count: open.length, level: open.length === 0 ? 'calm' : (hot ? 'hot' : 'open') };
+}
+
+function mergeListById(a, b, pick) {
+  const map = {};
+  (a || []).forEach((x) => { map[x.id] = x; });
+  (b || []).forEach((x) => {
+    const cur = map[x.id];
+    map[x.id] = cur ? pick(cur, x) : x;
+  });
+  return Object.values(map);
+}
+
+export function mergeState(local, remote) {
+  if (!remote) return clone(local);
+  if (!local) return clone(remote);
+  const out = clone(local);
+  // settings LWW
+  const lu = local.settings && local.settings.updatedAt;
+  const ru = remote.settings && remote.settings.updatedAt;
+  if (ru && (!lu || ru > lu)) out.settings = clone(remote.settings);
+  // items LWW per id
+  out.items = mergeListById(local.items, remote.items,
+    (c, x) => ((x.updatedAt || '') >= (c.updatedAt || '') ? x : c));
+  // checkRuns: union datoer, per-item LWW på .at
+  out.checkRuns = clone(local.checkRuns || {});
+  const rc = remote.checkRuns || {};
+  for (const date of Object.keys(rc)) {
+    out.checkRuns[date] = out.checkRuns[date] || { items: {} };
+    const ritems = (rc[date] && rc[date].items) || {};
+    for (const k of Object.keys(ritems)) {
+      const cur = out.checkRuns[date].items[k];
+      if (!cur || (ritems[k].at || '') >= (cur.at || '')) out.checkRuns[date].items[k] = ritems[k];
+    }
+  }
+  // log union-by-id (A vinner ved lik id)
+  out.log = mergeListById(local.log, remote.log, (c) => c);
+  return out;
+}
+
+export const LOG_KEEP = 200;
+export function pruneLog(state, keep = LOG_KEEP) {
+  const out = clone(state);
+  out.log = (out.log || []).slice(-keep);
+  return out;
 }
