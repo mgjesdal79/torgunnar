@@ -1,4 +1,4 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog } from '../js/logic.js';
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso } from '../js/logic.js';
 
 export function runTests() {
   const results = [];
@@ -258,6 +258,11 @@ export function runTests() {
     for (let i = 0; i < 10; i++) s.log.push({ id: 'e' + i, at: '2026-10-13T0' + i + ':00:00Z' });
     const p = pruneLog(s, 3);
     eq(p.log.length, 3); eq(p.log[2].id, 'e9');
+  });
+
+  t('addMinutesIso legger til minutter', () => {
+    eq(addMinutesIso('2026-10-13T08:00:00.000Z', 60), '2026-10-13T09:00:00.000Z');
+    eq(addMinutesIso('2026-10-13T08:00:00.000Z', 180), '2026-10-13T11:00:00.000Z');
   });
 
   return results;

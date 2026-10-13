@@ -246,3 +246,7 @@ export function pruneLog(state, keep = LOG_KEEP) {
   out.log = (out.log || []).slice(-keep);
   return out;
 }
+
+export function addMinutesIso(iso, minutes) {
+  return new Date(new Date(iso).getTime() + minutes * 60000).toISOString();
+}
