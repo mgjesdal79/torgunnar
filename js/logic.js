@@ -55,3 +55,34 @@ export function addItem(state, { text, type = null, category = null }, ctx) {
 export function activeItems(state) {
   return (state.items || []).filter((i) => !i.removed);
 }
+
+function patchItem(state, id, fn, ctx) {
+  const out = clone(state);
+  const it = out.items.find((i) => i.id === id);
+  if (!it) return state;
+  fn(it);
+  it.updatedAt = ctx.now;
+  return out;
+}
+
+export function classifyItem(state, { id, type }, ctx) {
+  return patchItem(state, id, (it) => {
+    it.type = type;
+    if (type === 'note') { it.due = null; it.remindAt = null; it.done = false; it.doneAt = null; }
+  }, ctx);
+}
+
+export function setItemCategory(state, { id, category }, ctx) {
+  return patchItem(state, id, (it) => { it.category = category; }, ctx);
+}
+
+export function setItemText(state, { id, text }, ctx) {
+  return patchItem(state, id, (it) => { it.text = String(text || '').trim(); }, ctx);
+}
+
+export function setReminder(state, { id, remindAt }, ctx) {
+  return patchItem(state, id, (it) => {
+    it.remindAt = remindAt;
+    if (!it.type || it.type === 'note') it.type = 'reminder';
+  }, ctx);
+}

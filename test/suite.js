@@ -1,4 +1,4 @@
-import { defaultState, clone, migrate, addItem, activeItems } from '../js/logic.js';
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder } from '../js/logic.js';
 
 export function runTests() {
   const results = [];
@@ -58,6 +58,41 @@ export function runTests() {
     s = addItem(s, { text: 'a' }, { now: '2026-10-13T08:00:00Z', id: 'a' });
     s.items[0].removed = true;
     eq(activeItems(s).length, 0);
+  });
+
+  function mk() {
+    let s = defaultState();
+    s = addItem(s, { text: 'x' }, { now: '2026-10-13T08:00:00Z', id: 'i1' });
+    return s;
+  }
+  t('classifyItem setter type og bumper updatedAt', () => {
+    let s = mk();
+    s = classifyItem(s, { id: 'i1', type: 'reminder' }, { now: '2026-10-13T09:00:00Z', id: 'l' });
+    eq(s.items[0].type, 'reminder');
+    eq(s.items[0].updatedAt, '2026-10-13T09:00:00Z');
+  });
+  t('classifyItem til note nullstiller frist/remind/done', () => {
+    let s = mk();
+    s.items[0].due = '2026-10-14'; s.items[0].remindAt = 'x'; s.items[0].done = true;
+    s = classifyItem(s, { id: 'i1', type: 'note' }, { now: '2026-10-13T09:00:00Z', id: 'l' });
+    eq(s.items[0].due, null); eq(s.items[0].remindAt, null); eq(s.items[0].done, false);
+  });
+  t('setItemCategory', () => {
+    let s = mk();
+    s = setItemCategory(s, { id: 'i1', category: 'hjem' }, { now: '2026-10-13T09:00:00Z', id: 'l' });
+    eq(s.items[0].category, 'hjem');
+  });
+  t('setItemText trimmer', () => {
+    let s = mk();
+    s = setItemText(s, { id: 'i1', text: '  ny  ' }, { now: '2026-10-13T09:00:00Z', id: 'l' });
+    eq(s.items[0].text, 'ny');
+  });
+  t('setReminder setter remindAt og type reminder', () => {
+    let s = mk();
+    s = setReminder(s, { id: 'i1', remindAt: '2026-10-13T11:00:00Z' },
+                    { now: '2026-10-13T09:00:00Z', id: 'l' });
+    eq(s.items[0].remindAt, '2026-10-13T11:00:00Z');
+    eq(s.items[0].type, 'reminder');
   });
 
   return results;
