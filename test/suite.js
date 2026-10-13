@@ -1,4 +1,4 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder } from '../js/logic.js';
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem } from '../js/logic.js';
 
 export function runTests() {
   const results = [];
@@ -93,6 +93,24 @@ export function runTests() {
                     { now: '2026-10-13T09:00:00Z', id: 'l' });
     eq(s.items[0].remindAt, '2026-10-13T11:00:00Z');
     eq(s.items[0].type, 'reminder');
+  });
+  t('completeItem setter done + doneAt + logger', () => {
+    let s = mk();
+    s = completeItem(s, { id: 'i1' }, { now: '2026-10-13T10:00:00Z', id: 'l' });
+    eq(s.items[0].done, true); eq(s.items[0].doneAt, '2026-10-13T10:00:00Z');
+    ok(s.log.some((e) => e.action === 'done'));
+  });
+  t('reopenItem nullstiller done', () => {
+    let s = mk();
+    s = completeItem(s, { id: 'i1' }, { now: '2026-10-13T10:00:00Z', id: 'l' });
+    s = reopenItem(s, { id: 'i1' }, { now: '2026-10-13T10:05:00Z', id: 'l' });
+    eq(s.items[0].done, false); eq(s.items[0].doneAt, null);
+  });
+  t('deleteItem er tombstone', () => {
+    let s = mk();
+    s = deleteItem(s, { id: 'i1' }, { now: '2026-10-13T10:00:00Z', id: 'l' });
+    eq(s.items[0].removed, true);
+    eq(activeItems(s).length, 0);
   });
 
   return results;

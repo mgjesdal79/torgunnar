@@ -86,3 +86,19 @@ export function setReminder(state, { id, remindAt }, ctx) {
     if (!it.type || it.type === 'note') it.type = 'reminder';
   }, ctx);
 }
+
+export function completeItem(state, { id }, ctx) {
+  const out = patchItem(state, id, (it) => { it.done = true; it.doneAt = ctx.now; }, ctx);
+  if (out !== state) pushLog(out, { id: id + ':done:' + ctx.now, type: 'item', action: 'done', itemId: id, at: ctx.now });
+  return out;
+}
+
+export function reopenItem(state, { id }, ctx) {
+  return patchItem(state, id, (it) => { it.done = false; it.doneAt = null; }, ctx);
+}
+
+export function deleteItem(state, { id }, ctx) {
+  const out = patchItem(state, id, (it) => { it.removed = true; }, ctx);
+  if (out !== state) pushLog(out, { id: id + ':del:' + ctx.now, type: 'item', action: 'delete', itemId: id, at: ctx.now });
+  return out;
+}
