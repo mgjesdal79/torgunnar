@@ -1,4 +1,4 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem } from '../js/logic.js';
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending } from '../js/logic.js';
 
 export function runTests() {
   const results = [];
@@ -111,6 +111,36 @@ export function runTests() {
     s = deleteItem(s, { id: 'i1' }, { now: '2026-10-13T10:00:00Z', id: 'l' });
     eq(s.items[0].removed, true);
     eq(activeItems(s).length, 0);
+  });
+
+  t('deferItem gjemmer item og setter resurfaceAt', () => {
+    let s = mk();
+    s = deferItem(s, { id: 'i1', resurfaceAt: '2026-10-14T08:00:00Z' },
+                  { now: '2026-10-13T10:00:00Z', id: 'l' });
+    eq(s.items[0].deferred, true);
+    eq(s.items[0].resurfaceAt, '2026-10-14T08:00:00Z');
+    ok(s.log.some((e) => e.action === 'defer'));
+  });
+  t('isResurfaced: deferred i framtida = ikke synlig', () => {
+    const it = { deferred: true, resurfaceAt: '2026-10-14T08:00:00Z' };
+    eq(isResurfaced(it, '2026-10-13T10:00:00Z'), false);
+    eq(isResurfaced(it, '2026-10-14T09:00:00Z'), true);
+  });
+  t('isResurfaced: ikke-deferred alltid synlig', () => {
+    eq(isResurfaced({ deferred: false }, '2026-10-13T10:00:00Z'), true);
+  });
+  t('isPending: åpen oppgave som ikke er gjemt', () => {
+    const now = '2026-10-13T10:00:00Z';
+    ok(isPending({ type: 'task', done: false, deferred: false, removed: false }, now));
+    eq(isPending({ type: 'task', done: true, deferred: false }, now), false);
+    eq(isPending({ type: 'note', done: false, deferred: false }, now), false);
+    eq(isPending({ type: 'task', done: false, deferred: true, resurfaceAt: '2026-10-20T00:00:00Z' }, now), false);
+  });
+  t('undeferItem vekker item', () => {
+    let s = mk();
+    s = deferItem(s, { id: 'i1', resurfaceAt: '2026-10-20T08:00:00Z' }, { now: '2026-10-13T10:00:00Z', id: 'l' });
+    s = undeferItem(s, { id: 'i1' }, { now: '2026-10-13T11:00:00Z', id: 'l' });
+    eq(s.items[0].deferred, false); eq(s.items[0].resurfaceAt, null);
   });
 
   return results;

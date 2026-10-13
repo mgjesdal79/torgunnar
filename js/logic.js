@@ -102,3 +102,29 @@ export function deleteItem(state, { id }, ctx) {
   if (out !== state) pushLog(out, { id: id + ':del:' + ctx.now, type: 'item', action: 'delete', itemId: id, at: ctx.now });
   return out;
 }
+
+export function deferItem(state, { id, resurfaceAt }, ctx) {
+  const out = patchItem(state, id, (it) => {
+    it.deferred = true; it.resurfaceAt = resurfaceAt;
+    it.done = false; it.doneAt = null;
+  }, ctx);
+  if (out !== state) pushLog(out, { id: id + ':defer:' + ctx.now, type: 'item', action: 'defer', itemId: id, at: ctx.now, resurfaceAt });
+  return out;
+}
+
+export function undeferItem(state, { id }, ctx) {
+  return patchItem(state, id, (it) => { it.deferred = false; it.resurfaceAt = null; }, ctx);
+}
+
+export function isResurfaced(item, now) {
+  if (!item.deferred) return true;
+  return !!item.resurfaceAt && item.resurfaceAt <= now;
+}
+
+// «Pending» = krever handling nå: avkryssbar type, ikke gjort, ikke gjemt.
+export function isPending(item, now) {
+  if (item.removed) return false;
+  if (item.type !== 'task' && item.type !== 'reminder') return false;
+  if (item.done) return false;
+  return isResurfaced(item, now);
+}
