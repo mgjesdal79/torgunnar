@@ -33,3 +33,25 @@ export function migrate(state, today) {
   if (!Array.isArray(out.log)) out.log = [];
   return out;
 }
+
+function pushLog(out, entry) { out.log.push(entry); }
+
+export function addItem(state, { text, type = null, category = null }, ctx) {
+  const out = clone(state);
+  const item = {
+    id: ctx.id, text: String(text || '').trim(),
+    type, category,
+    done: false, doneAt: null,
+    due: null, remindAt: null,
+    resurfaceAt: null, deferred: false, iosPushedAt: null,
+    source: null, routineId: null, routineDate: null, subtasks: null,
+    createdAt: ctx.now, updatedAt: ctx.now, removed: false,
+  };
+  out.items.push(item);
+  pushLog(out, { id: ctx.id + ':add', type: 'item', action: 'add', itemId: ctx.id, at: ctx.now });
+  return out;
+}
+
+export function activeItems(state) {
+  return (state.items || []).filter((i) => !i.removed);
+}
