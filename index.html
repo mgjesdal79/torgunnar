@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>PandaCoins</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  :root{
+    --bg:#13141a; --surface:#1e2029; --surface2:#262935; --line:#323545;
+    --ink:#f4f5f2; --dim:#a7acbd; --faint:#6b7087;
+    --bamboo:#5fbf74; --bamboo-dim:#2f5f3a; --gold:#f5c518; --rose:#e0607a; --blue:#6aa0e0;
+    --radius:18px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#0c0d12;color:var(--ink);
+    font-family:-apple-system,"Segoe UI",system-ui,Arial,sans-serif;
+    max-width:520px;margin:0 auto;min-height:100vh;
+    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+  .banner{text-align:center;padding:16px 10px 8px}
+  .banner .b{font-weight:800;font-size:18px}
+  .banner .status{color:var(--dim);font-size:13px;margin-top:4px}
+  .body{padding:4px 14px 90px}
+  .capbar{display:flex;align-items:center;gap:10px;background:var(--surface);
+    border:1px solid var(--line);border-radius:999px;padding:13px 16px;margin:8px 2px 16px;
+    color:var(--dim);font-size:15px;width:calc(100% - 4px)}
+  .capbar .p{width:30px;height:30px;border-radius:50%;background:var(--bamboo);color:#06220d;
+    display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex:none}
+  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .tile{position:relative;background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--radius);padding:16px 8px 13px;text-align:center;cursor:pointer}
+  .tile .ic{font-size:27px;display:block;margin-bottom:7px}
+  .tile .lb{font-size:13px;font-weight:600}
+  .badge{position:absolute;top:8px;right:8px;min-width:22px;height:22px;border-radius:999px;
+    font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 6px}
+  .badge.hot{background:var(--rose);color:#fff}
+  .badge.open{background:var(--bamboo);color:#06220d}
+  .badge.calm{display:none}
+  h2{font-size:18px;margin:14px 2px 8px}
+  .sub{color:var(--dim);font-size:13px;margin:0 2px 12px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:2px 14px;margin-bottom:12px}
+  .row{display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:none}
+  .chk{width:26px;height:26px;border-radius:50%;border:2px solid var(--faint);flex:none;cursor:pointer;
+    transition:transform .12s ease, background .12s ease}
+  .chk.on{background:var(--bamboo);border-color:var(--bamboo)}
+  .chk.pop{transform:scale(1.25)}
+  .rtxt{flex:1}.rtxt .t{font-weight:600}.rtxt .m{font-size:12px;color:var(--dim);margin-top:2px}
+  .rtxt.done .t{text-decoration:line-through;color:var(--faint)}
+  .mini{background:none;border:1px solid var(--line);color:var(--dim);border-radius:999px;
+    padding:6px 11px;font-size:13px;cursor:pointer}
+  .typ{font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}
+  .back{background:none;border:none;color:var(--bamboo);font-size:15px;padding:8px 2px;cursor:pointer}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;
+    justify-content:center;z-index:50}
+  .sheet{background:var(--surface);border:1px solid var(--line);border-radius:22px 22px 0 0;
+    padding:18px 16px calc(18px + env(safe-area-inset-bottom));width:100%;max-width:520px}
+  .inp{width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:14px;
+    color:var(--ink);padding:14px;font-size:16px;margin-bottom:6px}
+  .lab{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:16px 2px 8px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{background:var(--surface2);border:1px solid var(--line);border-radius:999px;
+    padding:10px 14px;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer}
+  .chip.on{background:var(--bamboo);border-color:var(--bamboo);color:#06220d}
+  .btn{display:block;width:100%;text-align:center;background:var(--bamboo);color:#06220d;
+    font-weight:800;border:none;border-radius:14px;padding:15px;font-size:15px;margin-top:18px;cursor:pointer}
+  .btn.ghost{background:none;border:1px solid var(--line);color:var(--dim);margin-top:8px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>window.EDGE_FUNCTION_URL = '';</script>
+<script type="module">
+  window.APP_VERSION = '1';
+  import('./js/app.js?cb=' + window.APP_VERSION);
+</script>
+</body>
+</html>
