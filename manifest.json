@@ -1,0 +1,9 @@
+{
+  "name": "PandaCoins",
+  "short_name": "PandaCoins",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c0d12",
+  "theme_color": "#0c0d12"
+}
