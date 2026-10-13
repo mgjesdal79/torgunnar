@@ -156,3 +156,48 @@ export function categoryItems(state, catId) {
 export function somedayItems(state) {
   return activeItems(state).filter((i) => i.type === 'someday');
 }
+
+function bumpSettings(out, ctx) { out.settings.updatedAt = ctx.now; }
+
+export function addCategory(state, { label, icon }, ctx) {
+  const out = clone(state);
+  const order = out.settings.categories.length;
+  out.settings.categories.push({ id: ctx.id, label: String(label || '').trim(), icon: icon || '📂', order });
+  bumpSettings(out, ctx);
+  return out;
+}
+
+export function updateCategory(state, { id, patch }, ctx) {
+  const out = clone(state);
+  const c = out.settings.categories.find((x) => x.id === id);
+  if (!c) return state;
+  Object.assign(c, patch);
+  bumpSettings(out, ctx);
+  return out;
+}
+
+export function deleteCategory(state, { id }, ctx) {
+  const out = clone(state);
+  out.settings.categories = out.settings.categories.filter((c) => c.id !== id);
+  out.items.forEach((i) => { if (i.category === id) { i.category = null; i.updatedAt = ctx.now; } });
+  bumpSettings(out, ctx);
+  return out;
+}
+
+export function reorderCategories(state, { orderedIds }, ctx) {
+  const out = clone(state);
+  const byId = {};
+  out.settings.categories.forEach((c) => { byId[c.id] = c; });
+  out.settings.categories = orderedIds.map((id, idx) => {
+    const c = byId[id]; if (c) c.order = idx; return c;
+  }).filter(Boolean);
+  bumpSettings(out, ctx);
+  return out;
+}
+
+export function categoryBadge(state, catId, now) {
+  const today = dayOf(now);
+  const open = categoryItems(state, catId).filter((i) => isPending(i, now));
+  const hot = open.some((i) => (i.due && dayOf(i.due) <= today) || (i.remindAt && i.remindAt <= now));
+  return { count: open.length, level: open.length === 0 ? 'calm' : (hot ? 'hot' : 'open') };
+}

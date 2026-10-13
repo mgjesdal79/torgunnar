@@ -1,4 +1,4 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems } from '../js/logic.js';
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge } from '../js/logic.js';
 
 export function runTests() {
   const results = [];
@@ -183,6 +183,38 @@ export function runTests() {
     let s = defaultState();
     s = addItem(s, { text: 's', type: 'someday' }, { now, id: 'a' });
     eq(somedayItems(s).map((i) => i.id), ['a']);
+  });
+
+  t('addCategory legger til med stigende order', () => {
+    let s = defaultState();
+    s = addCategory(s, { label: 'Trening', icon: '🏃' }, { now: '2026-10-13T08:00:00Z', id: 'trening' });
+    const c = s.settings.categories.find((x) => x.id === 'trening');
+    ok(c); eq(c.label, 'Trening'); eq(c.order, 3);
+  });
+  t('deleteCategory foreldreløser items til Innboks (category=null)', () => {
+    const now = '2026-10-13T08:00:00Z';
+    let s = defaultState();
+    s = addItem(s, { text: 'x', type: 'task', category: 'jobb' }, { now, id: 'a' });
+    s = deleteCategory(s, { id: 'jobb' }, { now, id: 'l' });
+    eq(s.settings.categories.some((c) => c.id === 'jobb'), false);
+    eq(s.items[0].category, null);
+  });
+  t('categoryBadge: hot når forfalt/i dag, open ellers, calm når tomt', () => {
+    const now = '2026-10-13T10:00:00Z';
+    let s = defaultState();
+    eq(categoryBadge(s, 'jobb', now).level, 'calm');
+    s = addItem(s, { text: 'a', type: 'task', category: 'jobb' }, { now, id: 'a' });
+    eq(categoryBadge(s, 'jobb', now).level, 'open');
+    eq(categoryBadge(s, 'jobb', now).count, 1);
+    s.items[0].due = '2026-10-12';
+    eq(categoryBadge(s, 'jobb', now).level, 'hot');
+  });
+  t('categoryBadge teller ikke gjemte/fullførte', () => {
+    const now = '2026-10-13T10:00:00Z';
+    let s = defaultState();
+    s = addItem(s, { text: 'a', type: 'task', category: 'jobb' }, { now, id: 'a' });
+    s.items[0].done = true;
+    eq(categoryBadge(s, 'jobb', now).count, 0);
   });
 
   return results;
