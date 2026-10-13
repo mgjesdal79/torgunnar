@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PandaCoins – skisser v2</title>
+<style>
+  :root{
+    --bg:#13141a; --surface:#1e2029; --surface2:#262935; --line:#323545;
+    --ink:#f4f5f2; --dim:#a7acbd; --faint:#6b7087;
+    --bamboo:#5fbf74; --bamboo-dim:#2f5f3a; --gold:#f5c518; --rose:#e0607a; --blue:#6aa0e0;
+    --radius:18px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#0c0d12;color:var(--ink);
+    font-family:-apple-system,"Segoe UI",system-ui,Arial,sans-serif;}
+  .wrap{display:flex;flex-wrap:wrap;gap:28px;justify-content:center;padding:28px 16px 40px}
+  .phone{width:344px;background:var(--bg);border-radius:34px;border:1px solid var(--line);
+    overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.5);display:flex;flex-direction:column;min-height:720px}
+  .cap{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);
+    text-align:center;margin:8px 0 4px}
+  .banner{text-align:center;padding:14px 10px 6px}
+  .banner .b{display:inline-flex;align-items:center;gap:8px;font-weight:800;font-size:18px}
+  .banner .b .coins{color:var(--gold)}
+  .banner .who{color:var(--faint);font-size:12px;margin-top:3px}
+  .body{flex:1;overflow:auto;padding:4px 14px 18px}
+
+  /* capture bar */
+  .capbar{display:flex;align-items:center;gap:10px;background:var(--surface);
+    border:1px solid var(--line);border-radius:999px;padding:12px 16px;margin:6px 2px 16px;
+    color:var(--dim);font-size:15px}
+  .capbar .p{width:30px;height:30px;border-radius:50%;background:var(--bamboo);color:#06220d;
+    display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex:none}
+
+  /* tile grid */
+  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .tile{position:relative;background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--radius);padding:16px 8px 13px;text-align:center}
+  .tile .ic{font-size:27px;display:block;margin-bottom:7px}
+  .tile .lb{font-size:13px;font-weight:600}
+  .tile.special{background:var(--surface2)}
+  .badge{position:absolute;top:8px;right:8px;min-width:22px;height:22px;border-radius:999px;
+    background:var(--bamboo);color:#06220d;font-size:12px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;padding:0 6px}
+  .badge.hot{background:var(--rose);color:#fff}
+  .badge.soft{background:var(--surface);border:1px solid var(--line);color:var(--dim)}
+
+  /* capture sheet */
+  .sheet{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:16px;margin:4px 2px}
+  .inp{width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:14px;
+    color:var(--ink);padding:14px;font-size:16px;margin-bottom:6px}
+  .hint{color:var(--faint);font-size:12px;margin:2px 2px 10px}
+  .lab{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:16px 2px 7px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{background:var(--surface2);border:1px solid var(--line);border-radius:999px;
+    padding:10px 14px;font-size:14px;font-weight:600;color:var(--ink)}
+  .chip.on{background:var(--bamboo);border-color:var(--bamboo);color:#06220d}
+  .chip.cat{color:var(--bamboo);border-color:var(--bamboo-dim)}
+  .chip.some.on{background:var(--gold);border-color:var(--gold);color:#2a2300}
+  .reveal{margin-top:10px;padding-top:12px;border-top:1px dashed var(--line)}
+  .btn{display:block;width:100%;text-align:center;background:var(--bamboo);color:#06220d;
+    font-weight:800;border:none;border-radius:14px;padding:14px;font-size:15px;margin-top:18px}
+
+  /* list rows */
+  h2{font-size:18px;margin:12px 2px 6px}
+  .sub{color:var(--dim);font-size:13px;margin:0 2px 12px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:6px 14px;margin-bottom:12px}
+  .row{display:flex;align-items:center;gap:12px;padding:12px 2px;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:none}
+  .chk{width:25px;height:25px;border-radius:50%;border:2px solid var(--faint);flex:none}
+  .chk.on{background:var(--bamboo);border-color:var(--bamboo)}
+  .rtxt{flex:1}.rtxt .t{font-weight:600}.rtxt .m{font-size:12px;color:var(--dim);margin-top:2px}
+  .typ{font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}
+  .typ.note{color:var(--blue);border-color:#2b4260}
+  .typ.task{color:var(--bamboo);border-color:var(--bamboo-dim)}
+  .typ.rem{color:var(--rose);border-color:#5a2733}
+  .back{color:var(--faint);font-size:14px;margin:4px 2px 2px}
+
+  .legend{max-width:760px;margin:0 auto;color:var(--dim);font-size:14px;line-height:1.65;padding:10px 18px 50px}
+  .legend h1{color:var(--ink);font-size:22px}
+  .legend b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 1. HJEM: kategori-rutenett -->
+  <div class="phone">
+    <div class="cap">1 · Hjem – kategori-rutenett</div>
+    <div class="banner"><div class="b">🐼 PandaCoins: <span class="coins">128 🟡</span></div>
+      <div class="who">Ting bor i kategorier – badge når noe venter</div></div>
+    <div class="body">
+      <div class="capbar"><span class="p">＋</span> Fang en tanke…</div>
+      <div class="grid">
+        <div class="tile"><span class="badge">3</span><span class="ic">💼</span><span class="lb">Jobb</span></div>
+        <div class="tile"><span class="badge">5</span><span class="ic">🏠</span><span class="lb">Hjem</span></div>
+        <div class="tile"><span class="badge soft">2</span><span class="ic">🛒</span><span class="lb">Handle</span></div>
+
+        <div class="tile special"><span class="badge hot">2</span><span class="ic">🌙</span><span class="lb">Kveldssjekk</span></div>
+        <div class="tile special"><span class="badge">1</span><span class="ic">🔁</span><span class="lb">Rutiner</span></div>
+        <div class="tile special"><span class="badge soft">4</span><span class="ic">💛</span><span class="lb">På et tidspunkt</span></div>
+
+        <div class="tile special"><span class="badge hot">6</span><span class="ic">📥</span><span class="lb">Innboks</span></div>
+        <div class="tile special"><span class="ic">📋</span><span class="lb">Logg</span></div>
+        <div class="tile special"><span class="ic">⚙️</span><span class="lb">Innstillinger</span></div>
+      </div>
+      <p class="hint" style="margin-top:14px">Rød badge = haster/i dag. Grønn = åpne ting.
+        Grå = rolig. Du kan legge til / endre / omrokkere kategorier selv.</p>
+    </div>
+  </div>
+
+  <!-- 2. FANG → KLASSIFISER -->
+  <div class="phone">
+    <div class="cap">2 · Fang først, bestem etterpå</div>
+    <div class="banner"><div class="b">🐼 Ny ting</div>
+      <div class="who">skriv nå – klassifiser når du vil</div></div>
+    <div class="body">
+      <div class="sheet">
+        <input class="inp" value="Kjøpe bursdagsgave til mamma">
+        <p class="hint">Dette alene er nok. Trykk Lagre, så ligger den i Innboks til du rydder.</p>
+
+        <div class="lab">Hva er dette?</div>
+        <div class="chips">
+          <span class="chip">📝 Notat</span>
+          <span class="chip on">✅ Oppgave</span>
+          <span class="chip">⏰ Påminnelse</span>
+          <span class="chip some">💛 På et tidspunkt</span>
+        </div>
+
+        <div class="reveal">
+          <div class="lab" style="margin-top:2px">Kategori</div>
+          <div class="chips">
+            <span class="chip cat">🛒 Handle</span><span class="chip">🏠 Hjem</span>
+            <span class="chip">💼 Jobb</span><span class="chip">＋ ny</span>
+          </div>
+        </div>
+
+        <button class="btn">Lagre 🟡 +1</button>
+      </div>
+      <p class="hint">Velger du <b>⏰ Påminnelse</b>, dukker +1t / +3t / «velg tid» opp – og den
+        sendes rett til iOS via snarveien din. Velger du <b>📝 Notat</b>, forsvinner frist/avkryssing.</p>
+    </div>
+  </div>
+
+  <!-- 3. KATEGORI-DETALJ -->
+  <div class="phone">
+    <div class="cap">3 · Inne i en kategori</div>
+    <div class="banner"><div class="b">💼 Jobb</div><div class="who">3 åpne · blandet innhold</div></div>
+    <div class="body">
+      <div class="capbar"><span class="p">＋</span> Fang noe i Jobb…</div>
+
+      <h2>Å gjøre</h2>
+      <div class="card">
+        <div class="row"><div class="chk"></div>
+          <div class="rtxt"><div class="t">Svare Karoline om innholdssak</div>
+            <div class="m">⏰ i dag 14:00</div></div><span class="typ rem">Påminnelse</span></div>
+        <div class="row"><div class="chk"></div>
+          <div class="rtxt"><div class="t">Lese gjennom fond-eksport</div></div>
+          <span class="typ task">Oppgave</span></div>
+      </div>
+
+      <h2>Notater</h2>
+      <div class="card">
+        <div class="row">
+          <div class="rtxt"><div class="t">Snowflake: bruk ANALYSIS_XS warehouse</div>
+            <div class="m">lagt til 3. okt</div></div><span class="typ note">Notat</span></div>
+      </div>
+      <p class="hint">Samme kategori rommer både huskelapper (notater) og ting å gjøre
+        (oppgaver/påminnelser). Avkryssbart = handling; notat = bare kunnskap.</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="legend">
+  <h1>🐼 PandaCoins v2 – kategori-først</h1>
+  <p><b>1 · Hjem</b> er et rutenett à la Honniscoins: dine kategorier + spesial-fliser
+  (Kveldssjekk, Rutiner, På et tidspunkt, Innboks, Logg, Innstillinger). Hver flis har en
+  <b>badge</b> – rød = haster/i dag, grønn = åpne, grå = rolig. Øverst alltid mynt-saldo + én
+  stor <b>«＋ Fang en tanke»</b>.</p>
+  <p><b>2 · Fang → klassifiser.</b> Du skriver teksten først. Så velger du type –
+  <b>Notat / Oppgave / Påminnelse / På et tidspunkt</b> – og evt. kategori. Uklassifisert =
+  havner i Innboks til du rydder. Velger du Påminnelse får du +1t/+3t rett til iOS.</p>
+  <p><b>3 · Inne i en kategori</b> bor både notater og handlinger side om side.</p>
+  <p>Under panseret: <b>ett «item»</b> med et <code style="color:var(--bamboo)">type</code>-felt
+  og valgfri kategori. Alle fliser = filtrerte visninger over samme liste. Lite å bygge,
+  konsistent å bruke.</p>
+</div>
+</body>
+</html>

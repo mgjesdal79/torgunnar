@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PandaCoins – skisser</title>
+<style>
+  :root{
+    --bg:#13141a; --surface:#1e2029; --surface2:#262935; --line:#323545;
+    --ink:#f4f5f2; --dim:#a7acbd; --faint:#6b7087;
+    --bamboo:#5fbf74; --bamboo-dim:#2f5f3a; --gold:#f5c518; --rose:#e0607a;
+    --radius:18px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#0c0d12;color:var(--ink);
+    font-family:-apple-system,"Segoe UI",system-ui,Arial,sans-serif;}
+  .wrap{display:flex;flex-wrap:wrap;gap:28px;justify-content:center;padding:28px 16px 80px}
+  .phone{width:340px;background:var(--bg);border-radius:34px;border:1px solid var(--line);
+    overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,.5);display:flex;flex-direction:column;min-height:720px}
+  .cap{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);
+    text-align:center;margin:6px 0 10px}
+  .top{padding:16px 16px 10px;display:flex;align-items:center;justify-content:space-between}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:700}
+  .coins{background:var(--surface2);border:1px solid var(--line);border-radius:999px;
+    padding:5px 11px;font-weight:700;font-size:14px}
+  .coins b{color:var(--gold)}
+  .body{flex:1;overflow:auto;padding:4px 14px 14px}
+  h2{font-size:19px;margin:10px 2px 6px}
+  .sub{color:var(--dim);font-size:13px;margin:0 2px 12px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px;margin-bottom:12px}
+  .row{display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid var(--line)}
+  .row:last-child{border-bottom:none}
+  .chk{width:26px;height:26px;border-radius:50%;border:2px solid var(--faint);flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:14px}
+  .chk.on{background:var(--bamboo);border-color:var(--bamboo);color:#06220d}
+  .rtxt{flex:1}
+  .rtxt .t{font-weight:600}
+  .rtxt .m{font-size:12px;color:var(--dim)}
+  .stamp{font-size:11px;color:var(--bamboo);font-weight:600}
+  .pill{display:inline-block;font-size:11px;padding:3px 9px;border-radius:999px;
+    background:var(--surface2);border:1px solid var(--line);color:var(--dim);margin-right:6px}
+  .pill.cat{color:var(--bamboo);border-color:var(--bamboo-dim)}
+  .pill.some{color:var(--gold);border-color:#6a5a16}
+  .pill.due{color:var(--rose);border-color:#5a2733}
+  .nav{display:flex;border-top:1px solid var(--line);background:var(--surface)}
+  .nav a{flex:1;text-align:center;padding:9px 0 12px;font-size:11px;color:var(--faint);
+    text-decoration:none}
+  .nav a .ic{font-size:21px;display:block;line-height:1.5}
+  .nav a.sel{color:var(--bamboo)}
+  .fab{position:relative}
+  .fab .plus{position:absolute;right:14px;bottom:70px;width:58px;height:58px;border-radius:50%;
+    background:var(--bamboo);color:#06220d;font-size:30px;display:flex;align-items:center;
+    justify-content:center;box-shadow:0 8px 22px rgba(95,191,116,.4);font-weight:700}
+  .sheet{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:16px;margin-bottom:12px}
+  .inp{width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:14px;
+    color:var(--ink);padding:13px;font-size:15px;margin-bottom:12px}
+  .presets{display:flex;flex-wrap:wrap;gap:8px}
+  .preset{background:var(--surface2);border:1px solid var(--line);border-radius:999px;
+    padding:9px 14px;font-size:14px;font-weight:600}
+  .preset.go{background:var(--bamboo);border-color:var(--bamboo);color:#06220d}
+  .catrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+  .btn{display:block;width:100%;text-align:center;background:var(--bamboo);color:#06220d;
+    font-weight:700;border:none;border-radius:14px;padding:13px;font-size:15px;margin-top:4px}
+  .panda{font-size:40px}
+  .hint{color:var(--faint);font-size:12px;margin:2px 2px 10px}
+  .legend{max-width:720px;margin:0 auto;color:var(--dim);font-size:14px;line-height:1.6;
+    padding:0 18px 40px}
+  .legend h1{color:var(--ink);font-size:22px}
+  .legend code{background:var(--surface2);padding:1px 6px;border-radius:6px;color:var(--bamboo)}
+  .prog{height:7px;border-radius:999px;background:var(--surface2);overflow:hidden;margin-top:8px}
+  .prog > i{display:block;height:100%;background:var(--bamboo)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- 1. I DAG -->
+  <div class="phone">
+    <div class="cap">1 · I dag</div>
+    <div class="top">
+      <div class="brand"><span class="panda">🐼</span> PandaCoins</div>
+      <div class="coins">🟡 <b>128</b></div>
+    </div>
+    <div class="body">
+      <h2>God morgen 🌱</h2>
+      <p class="sub">3 ting venter i dag. Panda heier på deg.</p>
+
+      <div class="card">
+        <div class="row"><div class="chk on">✓</div>
+          <div class="rtxt"><div class="t">Ta medisin</div><div class="m">Rutine · daglig</div></div>
+          <div class="stamp">+2 🟡</div></div>
+        <div class="row"><div class="chk"></div>
+          <div class="rtxt"><div class="t">Pakk treningsbag</div><div class="m">Rutine · man/ons/fre</div></div></div>
+        <div class="row"><div class="chk"></div>
+          <div class="rtxt"><div class="t">Ring tannlegen</div>
+            <div class="m"><span class="pill due">⏰ 14:00</span></div></div></div>
+      </div>
+
+      <h2>Fanget nylig</h2>
+      <div class="card">
+        <div class="row"><div class="chk"></div>
+          <div class="rtxt"><div class="t">Se på ny oppvaskmaskin-pris</div>
+            <div class="m"><span class="pill cat">Hjem</span></div></div></div>
+        <div class="row"><div class="chk"></div>
+          <div class="rtxt"><div class="t">Svare Karoline om innholdssak</div>
+            <div class="m"><span class="pill cat">Jobb</span> <span class="pill">⏰ +1t</span></div></div></div>
+      </div>
+    </div>
+    <div class="fab"><div class="plus">＋</div></div>
+    <div class="nav">
+      <a class="sel"><span class="ic">🏠</span>I dag</a>
+      <a><span class="ic">📥</span>Innboks</a>
+      <a><span class="ic">🌙</span>Kveld</a>
+      <a><span class="ic">🔁</span>Rutiner</a>
+    </div>
+  </div>
+
+  <!-- 2. FANG (capture sheet) -->
+  <div class="phone">
+    <div class="cap">2 · Fang en tanke (＋)</div>
+    <div class="top">
+      <div class="brand"><span class="panda">🐼</span> Ny ting</div>
+      <div class="coins" style="opacity:.5">avbryt ✕</div>
+    </div>
+    <div class="body">
+      <div class="sheet">
+        <input class="inp" value="Kjøpe bursdagsgave til mamma" placeholder="Hva skal du ikke glemme?">
+        <p class="hint">Trenger ingen detaljer. Bare skriv og lagre – rydd senere.</p>
+
+        <p class="cap" style="text-align:left;margin:6px 0">Minn meg på om…</p>
+        <div class="presets">
+          <span class="preset">+1t</span>
+          <span class="preset go">+3t</span>
+          <span class="preset">i kveld</span>
+          <span class="preset">i morgen</span>
+          <span class="preset">velg tid…</span>
+        </div>
+
+        <p class="cap" style="text-align:left;margin:14px 0 2px">Kategori (valgfritt)</p>
+        <div class="catrow">
+          <span class="pill cat">Jobb</span><span class="pill">Hjem</span>
+          <span class="pill">Handle</span><span class="pill some">På et tidspunkt</span>
+          <span class="pill">＋ ny</span>
+        </div>
+
+        <button class="btn" style="margin-top:16px">Lagre 🟡 +1</button>
+      </div>
+      <p class="hint">«+3t» sender påminnelsen rett til iOS via snarveien din –
+        samme mas du allerede stoler på.</p>
+    </div>
+    <div class="nav">
+      <a><span class="ic">🏠</span>I dag</a>
+      <a class="sel"><span class="ic">📥</span>Innboks</a>
+      <a><span class="ic">🌙</span>Kveld</a>
+      <a><span class="ic">🔁</span>Rutiner</a>
+    </div>
+  </div>
+
+  <!-- 3. KVELDSSJEKK -->
+  <div class="phone">
+    <div class="cap">3 · Kveldssjekk</div>
+    <div class="top">
+      <div class="brand"><span class="panda">🐼</span> God natt</div>
+      <div class="coins">🟡 <b>128</b></div>
+    </div>
+    <div class="body">
+      <h2>Kveldssjekk 🌙</h2>
+      <p class="sub">Samme liste hver kveld. Trykk for å bekrefte – da slipper du å lure.</p>
+      <div class="prog"><i style="width:60%"></i></div>
+      <p class="hint">3 av 5 bekreftet</p>
+
+      <div class="card">
+        <div class="row"><div class="chk on">✓</div>
+          <div class="rtxt"><div class="t">Ytterdør låst</div><div class="m">bekreftet 22:14</div></div></div>
+        <div class="row"><div class="chk on">✓</div>
+          <div class="rtxt"><div class="t">Alarm på</div><div class="m">bekreftet 22:14</div></div></div>
+        <div class="row"><div class="chk on">✓</div>
+          <div class="rtxt"><div class="t">Bil låst</div><div class="m">bekreftet 22:15</div></div></div>
+        <div class="row"><div class="chk"></div>
+          <div class="rtxt"><div class="t">Komfyr av</div><div class="m">ikke bekreftet ennå</div></div></div>
+        <div class="row"><div class="chk"></div>
+          <div class="rtxt"><div class="t">Lade telefon</div><div class="m">ikke bekreftet ennå</div></div></div>
+      </div>
+      <p class="hint">Nullstilles automatisk hver kveld. Tidsstempelet er beviset ditt –
+        ingen «lukket jeg egentlig?»-grubling.</p>
+    </div>
+    <div class="nav">
+      <a><span class="ic">🏠</span>I dag</a>
+      <a><span class="ic">📥</span>Innboks</a>
+      <a class="sel"><span class="ic">🌙</span>Kveld</a>
+      <a><span class="ic">🔁</span>Rutiner</a>
+    </div>
+  </div>
+
+  <!-- 4. INNBOKS / NOTATER / SOMEDAY -->
+  <div class="phone">
+    <div class="cap">4 · Innboks, notater & «på et tidspunkt»</div>
+    <div class="top">
+      <div class="brand"><span class="panda">🐼</span> Innboks</div>
+      <div class="coins">🟡 <b>128</b></div>
+    </div>
+    <div class="body">
+      <h2>Å rydde (4)</h2>
+      <p class="sub">Fanget uten detaljer. Dra inn i en kategori eller kryss ut.</p>
+      <div class="card">
+        <div class="row"><div class="chk"></div><div class="rtxt"><div class="t">Bytte vinterdekk</div></div><span class="pill">rydd →</span></div>
+        <div class="row"><div class="chk"></div><div class="rtxt"><div class="t">Sjekke strømavtale</div></div><span class="pill">rydd →</span></div>
+      </div>
+
+      <h2>Kategorier</h2>
+      <div class="card">
+        <div class="row"><div class="rtxt"><div class="t">💼 Jobb</div><div class="m">3 åpne</div></div><span class="pill">›</span></div>
+        <div class="row"><div class="rtxt"><div class="t">🏠 Hjem</div><div class="m">5 åpne</div></div><span class="pill">›</span></div>
+        <div class="row"><div class="rtxt"><div class="t">🛒 Handle</div><div class="m">2 åpne</div></div><span class="pill">›</span></div>
+      </div>
+
+      <h2>På et tidspunkt 💛</h2>
+      <p class="sub">Kona sine «ikke glem at på et tidspunkt…». Ingen frist – panda minner deg forsiktig innimellom.</p>
+      <div class="card">
+        <div class="row"><div class="rtxt"><div class="t">Rydde i garasjen før jul</div>
+          <div class="m"><span class="pill some">neste gang hjemme en helg</span></div></div></div>
+        <div class="row"><div class="rtxt"><div class="t">Spørre naboen om hekken</div>
+          <div class="m"><span class="pill some">dukker opp om 5 dager</span></div></div></div>
+      </div>
+    </div>
+    <div class="nav">
+      <a><span class="ic">🏠</span>I dag</a>
+      <a class="sel"><span class="ic">📥</span>Innboks</a>
+      <a><span class="ic">🌙</span>Kveld</a>
+      <a><span class="ic">🔁</span>Rutiner</a>
+    </div>
+  </div>
+
+</div>
+
+<div class="legend">
+  <h1>🐼 PandaCoins – retning</h1>
+  <p>Fire skjermer over: <b>I dag</b> (dagens rutiner + det som haster + panda som heier),
+  <b>Fang (＋)</b> (null-friksjon notering med +1t/+3t rett til iOS), <b>Kveldssjekk</b>
+  (fast liste, trykk-for-å-bekrefte med tidsstempel, nullstilles hver kveld), og
+  <b>Innboks/Notater/På et tidspunkt</b> (fang nå, rydd senere; kategorier; egen forsiktig
+  someday-bøtte for kona sine fluffy ting).</p>
+  <p>Myk, rolig stil (bambusgrønn + gull mynt, panda-maskot) – belønning som føles godt uten
+  mas. Ingen skjøre streaks, ingen straff. Dette er bare en skisse for retning –
+  farger/ikoner/navn kan vi finjustere.</p>
+</div>
+
+</body>
+</html>
