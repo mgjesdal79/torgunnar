@@ -43,7 +43,12 @@ function renderHome() {
 
 function render() {
   const root = document.getElementById('app');
-  if (App.view === 'home') root.innerHTML = renderHome();
+  const v = App.view;
+  if (v === 'category') root.innerHTML = renderCategory();
+  else if (v === 'inbox') root.innerHTML = renderInbox();
+  else if (v === 'today') root.innerHTML = renderToday();
+  else if (v === 'settings') root.innerHTML = renderSettings();
+  else root.innerHTML = renderHome();
   bind(root);
 }
 
@@ -54,6 +59,12 @@ function bind(root) {
     el.onclick = () => { App.view = el.dataset.view; render(); });
   const cap = root.querySelector('[data-cap]');
   if (cap) cap.onclick = () => openSheet(null);
+  root.querySelectorAll('[data-home]').forEach((el) =>
+    el.onclick = () => { App.view = 'home'; App.catId = null; render(); });
+  root.querySelectorAll('[data-done]').forEach((el) =>
+    el.onclick = () => doComplete(el.dataset.done, el));
+  root.querySelectorAll('[data-defer]').forEach((el) =>
+    el.onclick = () => openDefer(el.dataset.defer));
 }
 
 const TYPES = [
@@ -121,6 +132,106 @@ function saveSheet() {
   }
   App.state = next; saveStateDebounced(App.state);
   closeSheet(); render();
+}
+
+function itemRowHtml(it) {
+  const checkable = it.type === 'task' || it.type === 'reminder';
+  const chk = checkable
+    ? `<span class="chk ${it.done ? 'on' : ''}" data-done="${it.id}"></span>`
+    : `<span style="width:26px"></span>`;
+  const meta = [];
+  if (it.due) meta.push('🗓 ' + it.due);
+  if (it.remindAt) meta.push('⏰ ' + it.remindAt.slice(11, 16));
+  if (it.deferred && it.resurfaceAt) meta.push('💤 tilbake ' + it.resurfaceAt.slice(0, 10));
+  const typeLabel = { note: 'Notat', task: 'Oppgave', reminder: 'Påminnelse', someday: 'På et tidspunkt' }[it.type] || 'Uklassifisert';
+  return `<div class="row">${chk}`
+    + `<div class="rtxt ${it.done ? 'done' : ''}"><div class="t">${esc(it.text)}</div>`
+    + (meta.length ? `<div class="m">${esc(meta.join(' · '))}</div>` : '')
+    + `</div>`
+    + (checkable && !it.done ? `<button class="mini" data-defer="${it.id}">Ikke nå</button>` : '')
+    + `<span class="typ">${typeLabel}</span></div>`;
+}
+
+function listCard(items) {
+  if (!items.length) return `<p class="sub">Ingenting her 🌱</p>`;
+  return `<div class="card">${items.map(itemRowHtml).join('')}</div>`;
+}
+
+function headerBar(title) {
+  return `<div class="banner"><button class="back" data-home="1">‹ Hjem</button>`
+    + `<div class="b">${esc(title)}</div></div>`;
+}
+
+function renderCategory() {
+  const now = nowIso();
+  const cat = App.state.settings.categories.find((c) => c.id === App.catId);
+  const items = L.categoryItems(App.state, App.catId);
+  const open = items.filter((i) => L.isPending(i, now));
+  const notes = items.filter((i) => i.type === 'note');
+  const rest = items.filter((i) => !open.includes(i) && !notes.includes(i));
+  return headerBar((cat ? cat.icon + ' ' + cat.label : 'Kategori'))
+    + `<div class="body">`
+    + `<div class="capbar" data-cap="1"><span class="p">＋</span> Fang noe i ${esc(cat ? cat.label : '')}…</div>`
+    + `<h2>Å gjøre</h2>${listCard(open)}`
+    + (notes.length ? `<h2>Notater</h2>${listCard(notes)}` : '')
+    + (rest.length ? `<h2>Annet</h2>${listCard(rest)}` : '')
+    + `</div>`;
+}
+
+function renderInbox() {
+  const items = L.inboxItems(App.state, nowIso());
+  return headerBar('📥 Innboks')
+    + `<div class="body"><p class="sub">Fanget uten type. Åpne for å klassifisere, eller kryss ut.</p>`
+    + listCard(items) + `</div>`;
+}
+
+function renderToday() {
+  const items = L.itemsForToday(App.state, nowIso());
+  return headerBar('📌 I dag')
+    + `<div class="body"><p class="sub">Det som krever deg nå.</p>` + listCard(items) + `</div>`;
+}
+
+function renderSettings() {
+  return headerBar('⚙️ Innstillinger')
+    + `<div class="body"><p class="sub">Kommer i egen plan (kategorier, kveldssjekk, rutiner, snarvei).</p></div>`;
+}
+
+function doComplete(id, el) {
+  el.classList.add('on', 'pop');
+  if (navigator.vibrate) navigator.vibrate(12);
+  setTimeout(() => {
+    commit(L.completeItem(App.state, { id }, ctx()));
+  }, 140);
+}
+
+const DEFER_PRESETS = [
+  { label: '+1t', min: 60 }, { label: '+3t', min: 180 },
+  { label: 'I kveld', atHour: 20 }, { label: 'I morgen', atHour: 8, addDay: 1 },
+  { label: 'Neste uke', atHour: 8, addDay: 7 },
+];
+
+function deferTarget(p) {
+  const d = new Date();
+  if (p.min) return new Date(d.getTime() + p.min * 60000).toISOString();
+  if (p.addDay) d.setDate(d.getDate() + p.addDay);
+  d.setHours(p.atHour, 0, 0, 0);
+  if (!p.addDay && d.getTime() < Date.now()) d.setDate(d.getDate() + 1); // «i kveld» passert → i morgen kveld
+  return d.toISOString();
+}
+
+function openDefer(id) {
+  const chips = DEFER_PRESETS.map((p, i) => `<span class="chip" data-dp="${i}">${p.label}</span>`).join('');
+  const html = `<div class="overlay" id="ov"><div class="sheet">`
+    + `<div class="lab">Ikke nå – dukk opp igjen:</div><div class="chips">${chips}</div>`
+    + `<button class="btn ghost" id="dCancel">Avbryt</button></div></div>`;
+  document.getElementById('app').insertAdjacentHTML('beforeend', html);
+  const o = document.getElementById('ov');
+  o.querySelector('#dCancel').onclick = () => o.remove();
+  o.querySelectorAll('[data-dp]').forEach((el) => el.onclick = () => {
+    const p = DEFER_PRESETS[Number(el.dataset.dp)];
+    o.remove();
+    commit(L.deferItem(App.state, { id, resurfaceAt: deferTarget(p) }, ctx()));
+  });
 }
 
 App.state = loadState();
