@@ -65,6 +65,8 @@ function bind(root) {
     el.onclick = () => doComplete(el.dataset.done, el));
   root.querySelectorAll('[data-defer]').forEach((el) =>
     el.onclick = () => openDefer(el.dataset.defer));
+  root.querySelectorAll('[data-edit]').forEach((el) =>
+    el.onclick = () => openEdit(el.dataset.edit));
 }
 
 const TYPES = [
@@ -75,7 +77,13 @@ const TYPES = [
 ];
 
 function openSheet(prefillCat) {
-  App.sheet = { text: '', type: null, category: prefillCat || null };
+  App.sheet = { editId: null, text: '', type: null, category: prefillCat || null };
+  renderSheet();
+}
+function openEdit(id) {
+  const it = App.state.items.find((i) => i.id === id);
+  if (!it) return;
+  App.sheet = { editId: id, text: it.text || '', type: it.type || null, category: it.category || null };
   renderSheet();
 }
 function closeSheet() { App.sheet = null; const o = document.getElementById('ov'); if (o) o.remove(); }
@@ -97,8 +105,9 @@ function renderSheet() {
     + `<div class="lab">Hva er dette? (valgfritt)</div><div class="chips">${typeChips}</div>`
     + remindRow
     + `<div class="lab">Kategori (valgfritt)</div><div class="chips">${catChips}</div>`
-    + `<button class="btn" id="capSave">Lagre</button>`
+    + `<button class="btn" id="capSave">${s.editId ? 'Lagre endringer' : 'Lagre'}</button>`
     + `<button class="btn ghost" id="capCancel">Avbryt</button>`
+    + (s.editId ? `<button class="btn ghost" id="capDelete">Slett</button>` : '')
     + `</div></div>`;
   const old = document.getElementById('ov'); if (old) old.remove();
   document.getElementById('app').insertAdjacentHTML('beforeend', html);
@@ -119,33 +128,57 @@ function bindSheet() {
     el.classList.add('on'); });
   o.querySelector('#capCancel').onclick = closeSheet;
   o.querySelector('#capSave').onclick = saveSheet;
+  const del = o.querySelector('#capDelete');
+  if (del) del.onclick = deleteFromSheet;
+}
+
+function deleteFromSheet() {
+  const id = App.sheet.editId;
+  App.sheet = null;
+  commit(L.deleteItem(App.state, { id }, ctx()));
 }
 
 function saveSheet() {
   const s = App.sheet;
   if (!s.text.trim()) { closeSheet(); return; }
   const c = ctx();
-  let next = L.addItem(App.state, { text: s.text, type: s.type, category: s.category }, c);
+  const id = s.editId || c.id;
+  let next;
+  if (s.editId) {
+    next = L.setItemText(App.state, { id, text: s.text }, c);
+    next = L.classifyItem(next, { id, type: s.type }, { now: c.now, id: newId() });
+    next = L.setItemCategory(next, { id, category: s.category }, { now: c.now, id: newId() });
+  } else {
+    next = L.addItem(App.state, { text: s.text, type: s.type, category: s.category }, c);
+  }
   if (s.type === 'reminder' && s._remindMin) {
-    next = L.setReminder(next, { id: c.id, remindAt: L.addMinutesIso(c.now, s._remindMin) },
+    next = L.setReminder(next, { id, remindAt: L.addMinutesIso(c.now, s._remindMin) },
                          { now: c.now, id: newId() });
   }
   App.state = next; saveStateDebounced(App.state);
   closeSheet(); render();
 }
 
+function fmtTime(iso) {
+  return new Date(iso).toLocaleTimeString('no-NO', { hour: '2-digit', minute: '2-digit' });
+}
+function fmtDate(iso) {
+  return new Date(iso).toLocaleDateString('no-NO', { day: '2-digit', month: '2-digit' });
+}
+
 function itemRowHtml(it) {
+  const now = nowIso();
   const checkable = it.type === 'task' || it.type === 'reminder';
   const chk = checkable
     ? `<span class="chk ${it.done ? 'on' : ''}" data-done="${it.id}"></span>`
     : `<span style="width:26px"></span>`;
   const meta = [];
   if (it.due) meta.push('🗓 ' + it.due);
-  if (it.remindAt) meta.push('⏰ ' + it.remindAt.slice(11, 16));
-  if (it.deferred && it.resurfaceAt) meta.push('💤 tilbake ' + it.resurfaceAt.slice(0, 10));
+  if (it.remindAt) meta.push('⏰ ' + fmtTime(it.remindAt));
+  if (it.deferred && it.resurfaceAt && !L.isResurfaced(it, now)) meta.push('💤 tilbake ' + fmtDate(it.resurfaceAt));
   const typeLabel = { note: 'Notat', task: 'Oppgave', reminder: 'Påminnelse', someday: 'På et tidspunkt' }[it.type] || 'Uklassifisert';
   return `<div class="row">${chk}`
-    + `<div class="rtxt ${it.done ? 'done' : ''}"><div class="t">${esc(it.text)}</div>`
+    + `<div class="rtxt ${it.done ? 'done' : ''}" data-edit="${it.id}"><div class="t">${esc(it.text)}</div>`
     + (meta.length ? `<div class="m">${esc(meta.join(' · '))}</div>` : '')
     + `</div>`
     + (checkable && !it.done ? `<button class="mini" data-defer="${it.id}">Ikke nå</button>` : '')
@@ -181,7 +214,7 @@ function renderCategory() {
 function renderInbox() {
   const items = L.inboxItems(App.state, nowIso());
   return headerBar('📥 Innboks')
-    + `<div class="body"><p class="sub">Fanget uten type. Åpne for å klassifisere, eller kryss ut.</p>`
+    + `<div class="body"><p class="sub">Fanget uten type. Trykk for å klassifisere eller slette.</p>`
     + listCard(items) + `</div>`;
 }
 
