@@ -128,3 +128,31 @@ export function isPending(item, now) {
   if (item.done) return false;
   return isResurfaced(item, now);
 }
+
+function dayOf(iso) { return (iso || '').slice(0, 10); }
+
+export function inboxItems(state, now) {
+  return activeItems(state).filter((i) => i.type == null && isResurfaced(i, now));
+}
+
+export function itemsForToday(state, now) {
+  const today = dayOf(now);
+  return activeItems(state).filter((i) => {
+    if (i.done) return false;
+    if (!isResurfaced(i, now)) return false;
+    if (i.type !== 'task' && i.type !== 'reminder') return false;
+    // nettopp gjen-oppdukket deferred
+    if (i.deferred && i.resurfaceAt && dayOf(i.resurfaceAt) <= today) return true;
+    if (i.due && dayOf(i.due) <= today) return true;
+    if (i.remindAt && i.remindAt <= now) return true;
+    return false;
+  });
+}
+
+export function categoryItems(state, catId) {
+  return activeItems(state).filter((i) => i.category === catId);
+}
+
+export function somedayItems(state) {
+  return activeItems(state).filter((i) => i.type === 'someday');
+}

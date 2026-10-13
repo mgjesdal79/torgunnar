@@ -1,4 +1,4 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending } from '../js/logic.js';
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems } from '../js/logic.js';
 
 export function runTests() {
   const results = [];
@@ -141,6 +141,48 @@ export function runTests() {
     s = deferItem(s, { id: 'i1', resurfaceAt: '2026-10-20T08:00:00Z' }, { now: '2026-10-13T10:00:00Z', id: 'l' });
     s = undeferItem(s, { id: 'i1' }, { now: '2026-10-13T11:00:00Z', id: 'l' });
     eq(s.items[0].deferred, false); eq(s.items[0].resurfaceAt, null);
+  });
+
+  t('inboxItems = uklassifisert (type null) og ikke gjemt', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'rå' }, { now: '2026-10-13T08:00:00Z', id: 'a' });
+    s = addItem(s, { text: 'klar', type: 'task', category: 'jobb' }, { now: '2026-10-13T08:00:00Z', id: 'b' });
+    const inb = inboxItems(s, '2026-10-13T09:00:00Z');
+    eq(inb.length, 1); eq(inb[0].id, 'a');
+  });
+  t('itemsFortoday: forfalt, dagens frist, remind<=nå, resurfaced', () => {
+    const now = '2026-10-13T10:00:00Z';
+    let s = defaultState();
+    s = addItem(s, { text: 'forfalt', type: 'task', category: 'jobb' }, { now, id: 'a' });
+    s.items[0].due = '2026-10-12';
+    s = addItem(s, { text: 'idag', type: 'task' }, { now, id: 'b' });
+    s.items[1].due = '2026-10-13';
+    s = addItem(s, { text: 'senere', type: 'task' }, { now, id: 'c' });
+    s.items[2].due = '2026-10-20';
+    s = addItem(s, { text: 'remind', type: 'reminder' }, { now, id: 'd' });
+    s.items[3].remindAt = '2026-10-13T09:00:00Z';
+    const today = itemsForToday(s, now).map((i) => i.id).sort();
+    eq(today, ['a', 'b', 'd']);
+  });
+  t('itemsForToday tar med nettopp gjen-oppdukket deferred', () => {
+    const now = '2026-10-13T10:00:00Z';
+    let s = defaultState();
+    s = addItem(s, { text: 'tilbake', type: 'task' }, { now, id: 'a' });
+    s.items[0].deferred = true; s.items[0].resurfaceAt = '2026-10-13T09:00:00Z';
+    eq(itemsForToday(s, now).map((i) => i.id), ['a']);
+  });
+  t('categoryItems filtrerer på kategori og aktiv', () => {
+    const now = '2026-10-13T10:00:00Z';
+    let s = defaultState();
+    s = addItem(s, { text: 'j', type: 'task', category: 'jobb' }, { now, id: 'a' });
+    s = addItem(s, { text: 'h', type: 'task', category: 'hjem' }, { now, id: 'b' });
+    eq(categoryItems(s, 'jobb').map((i) => i.id), ['a']);
+  });
+  t('somedayItems', () => {
+    const now = '2026-10-13T10:00:00Z';
+    let s = defaultState();
+    s = addItem(s, { text: 's', type: 'someday' }, { now, id: 'a' });
+    eq(somedayItems(s).map((i) => i.id), ['a']);
   });
 
   return results;
