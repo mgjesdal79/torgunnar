@@ -74,7 +74,7 @@ function bind(root) {
       render();
     });
   const cap = root.querySelector('[data-cap]');
-  if (cap) cap.onclick = () => openSheet(null);
+  if (cap) cap.onclick = () => openSheet(null, cap.dataset.captype || null);
   root.querySelectorAll('[data-home]').forEach((el) =>
     el.onclick = () => { App.view = 'home'; App.catId = null; render(); });
   root.querySelectorAll('[data-done]').forEach((el) =>
@@ -111,14 +111,16 @@ const TYPES = [
   { id: 'someday', label: '💛 På et tidspunkt' },
 ];
 
-function openSheet(prefillCat) {
-  App.sheet = { editId: null, text: '', type: null, category: prefillCat || null };
+function openSheet(prefillCat, prefillType) {
+  App.sheet = { editId: null, text: '', type: prefillType || null, category: prefillCat || null,
+                insistence: 'chill', cadenceDays: 7 };
   renderSheet();
 }
 function openEdit(id) {
   const it = App.state.items.find((i) => i.id === id);
   if (!it) return;
-  App.sheet = { editId: id, text: it.text || '', type: it.type || null, category: it.category || null };
+  App.sheet = { editId: id, text: it.text || '', type: it.type || null, category: it.category || null,
+                insistence: it.insistence || 'chill', cadenceDays: it.cadenceDays || 7 };
   renderSheet();
 }
 function closeSheet() { App.sheet = null; const o = document.getElementById('ov'); if (o) o.remove(); }
@@ -130,6 +132,19 @@ function renderSheet() {
     `<span class="chip ${s.type === tp.id ? 'on' : ''}" data-type="${tp.id}">${tp.label}</span>`).join('');
   const catChips = cats.map((c) =>
     `<span class="chip ${s.category === c.id ? 'on' : ''}" data-catchip="${esc(c.id)}">${c.icon} ${esc(c.label)}</span>`).join('');
+  const INSIST_CHIPS = [['chill', '😴 Chill'], ['nudge', '👋 Dult'], ['nag', '📣 Masete']];
+  const insistRow = s.type === 'someday'
+    ? `<div class="lab">Hvor mye skal den mase?</div><div class="chips">`
+      + INSIST_CHIPS.map(([k, l]) =>
+          `<span class="chip ${s.insistence === k ? 'on' : ''}" data-insist="${k}">${l}</span>`).join('')
+      + `</div>`
+      + (s.insistence === 'nudge'
+          ? `<div class="lab">Kom tilbake hver…</div><div class="chips">`
+            + [3, 7, 14, 30].map((d) =>
+                `<span class="chip ${s.cadenceDays === d ? 'on' : ''}" data-cad="${d}">${d} dager</span>`).join('')
+            + `</div>`
+          : '')
+    : '';
   const remindRow = s.type === 'reminder'
     ? `<div class="lab">Minn meg om…</div><div class="chips">`
       + App.state.settings.remindPresets.map((m) =>
@@ -138,6 +153,7 @@ function renderSheet() {
   const html = `<div class="overlay" id="ov"><div class="sheet">`
     + `<input class="inp" id="capText" placeholder="Hva skal du ikke glemme?" value="${esc(s.text)}">`
     + `<div class="lab">Hva er dette? (valgfritt)</div><div class="chips">${typeChips}</div>`
+    + insistRow
     + remindRow
     + `<div class="lab">Kategori (valgfritt)</div><div class="chips">${catChips}</div>`
     + `<button class="btn" id="capSave">${s.editId ? 'Lagre endringer' : 'Lagre'}</button>`
@@ -157,6 +173,10 @@ function bindSheet() {
     App.sheet.type = App.sheet.type === el.dataset.type ? null : el.dataset.type; renderSheet(); });
   o.querySelectorAll('[data-catchip]').forEach((el) => el.onclick = () => {
     App.sheet.category = App.sheet.category === el.dataset.catchip ? null : el.dataset.catchip; renderSheet(); });
+  o.querySelectorAll('[data-insist]').forEach((el) => el.onclick = () => {
+    App.sheet.insistence = el.dataset.insist; renderSheet(); });
+  o.querySelectorAll('[data-cad]').forEach((el) => el.onclick = () => {
+    App.sheet.cadenceDays = Number(el.dataset.cad); renderSheet(); });
   o.querySelectorAll('[data-remind]').forEach((el) => el.onclick = () => {
     App.sheet._remindMin = Number(el.dataset.remind);
     o.querySelectorAll('[data-remind]').forEach((x) => x.classList.remove('on'));
@@ -185,6 +205,10 @@ function saveSheet() {
     next = L.setItemCategory(next, { id, category: s.category }, { now: c.now, id: newId() });
   } else {
     next = L.addItem(App.state, { text: s.text, type: s.type, category: s.category }, c);
+  }
+  if (s.type === 'someday') {
+    next = L.setInsistence(next, { id, insistence: s.insistence, cadenceDays: s.cadenceDays },
+                           { now: c.now, id: newId() });
   }
   if (s.type === 'reminder' && s._remindMin) {
     next = L.setReminder(next, { id, remindAt: L.addMinutesIso(c.now, s._remindMin) },
