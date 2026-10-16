@@ -39,22 +39,26 @@ function tileHtml(icon, label, badge, data) {
 function renderHome() {
   const now = nowIso();
   const inboxN = L.inboxItems(App.state, now).length;
-  const todayN = L.itemsForToday(App.state, now).length;
+  const todayItems = L.itemsForToday(App.state, now);
   const taskN = L.taskItems(App.state, now).length;
   const mediumN = L.mediumBadge(App.state);
   const konaN = L.konaBadge(App.state);
   const tiles = tileHtml('📥', 'Innboks', { count: inboxN, level: inboxN ? 'hot' : 'calm' }, 'data-view="inbox"')
-    + tileHtml('📌', 'I dag', { count: todayN, level: todayN ? 'open' : 'calm' }, 'data-view="today"')
     + tileHtml('✅', 'Gjøremål', { count: taskN, level: taskN ? 'open' : 'calm' }, 'data-view="tasks"')
     + tileHtml('💛', 'Langsiktig', mediumN, 'data-view="medium"')
     + tileHtml('📝', 'Notater', null, 'data-view="notes"')
     + tileHtml('💬', 'Ingrid', konaN, 'data-view="kona"')
     + tileHtml('🔁', 'Rutiner', null, 'data-view="routines"')
     + tileHtml('⚙️', 'Innstillinger', null, 'data-view="settings"');
+  const todaySection = `<h2 class="todayhead" data-view="today">📌 I dag</h2>`
+    + (todayItems.length
+        ? listCard(todayItems)
+        : `<p class="sub">Ingenting krever deg akkurat nå 🌱</p>`);
   return `<div class="banner"><div class="b">🦸‍♂️ Tor Gunnar</div>`
     + quoteHtml() + `</div>`
     + `<div class="body">`
     + captureBlock({})
+    + todaySection
     + `<div class="grid">${tiles}</div></div>`;
 }
 

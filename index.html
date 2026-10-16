@@ -52,6 +52,8 @@
   .badge.open{background:var(--bamboo);color:#06220d}
   .badge.calm{display:none}
   h2{font-size:18px;margin:14px 2px 8px}
+  h2.todayhead{cursor:pointer}
+  h2.todayhead::after{content:' ›';color:var(--faint)}
   .sub{color:var(--dim);font-size:13px;margin:0 2px 12px}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
     padding:2px 14px;margin-bottom:12px}
@@ -116,7 +118,7 @@
 <footer class="build" id="build"></footer>
 <script>window.EDGE_FUNCTION_URL = '';</script>
 <script type="module">
-  window.APP_VERSION = '10';
+  window.APP_VERSION = '11';
   window.APP_BUILD = '2026-10-16';
   const b = document.getElementById('build');
   if (b) b.textContent = 'build ' + window.APP_VERSION + ' · ' + window.APP_BUILD;
