@@ -1,4 +1,4 @@
-const VERSION = '8';
+const VERSION = '9';
 const CACHE = 'torgunnar-v' + VERSION;
 const SHELL = [
   './', './index.html', './manifest.json',

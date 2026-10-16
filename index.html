@@ -81,6 +81,18 @@
   textarea.inp{resize:vertical;min-height:64px;font-family:inherit;line-height:1.4}
   .taskacts{display:flex;flex-wrap:wrap;gap:6px;padding:2px 2px 12px}
   .taskacts .mini{margin:0}
+  .capture{padding:12px 14px 14px;margin-bottom:16px}
+  .capture .inp{margin-bottom:0}
+  .capture .lab{margin:12px 2px 8px}
+  .capture .btn{margin-top:12px}
+  .editrow{padding:12px 2px;border-bottom:1px solid var(--line)}
+  .editrow:last-child{border-bottom:none}
+  .editrow .inp{margin-bottom:0}
+  .editrow .lab{margin:12px 2px 8px}
+  .editacts{display:flex;gap:8px;align-items:center;margin-top:12px}
+  .editacts .btn{margin-top:0;flex:1}
+  .editacts .mini{margin:0}
+  .mini.danger{color:var(--rose);border-color:var(--rose)}
   .rhead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 2px;cursor:pointer}
   .rhead .t{font-weight:700}
   .rhead .sub{margin:0;font-size:12px;white-space:nowrap}
@@ -98,7 +110,7 @@
 <footer class="build" id="build"></footer>
 <script>window.EDGE_FUNCTION_URL = '';</script>
 <script type="module">
-  window.APP_VERSION = '8';
+  window.APP_VERSION = '9';
   window.APP_BUILD = '2026-10-16';
   const b = document.getElementById('build');
   if (b) b.textContent = 'build ' + window.APP_VERSION + ' · ' + window.APP_BUILD;

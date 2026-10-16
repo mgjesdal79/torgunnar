@@ -1,7 +1,12 @@
 import * as L from './logic.js';
 import { loadState, saveStateDebounced, nowIso, todayIso, newId } from './store.js';
 
-const App = { view: 'home', catId: null, sheet: null, state: null, rOpen: {}, routineEdit: null };
+const App = {
+  view: 'home', catId: null, state: null, rOpen: {}, routineEdit: null,
+  cap: { text: '', type: 'task', insistence: 'chill', cadenceDays: 7 },
+  capFixed: null, capStay: false,
+  edit: null,
+};
 
 function ctx() { return { now: nowIso(), id: newId() }; }
 function commit(next) { App.state = next; saveStateDebounced(App.state); render(); }
@@ -49,7 +54,7 @@ function renderHome() {
   return `<div class="banner"><div class="b">🦸‍♂️ Tor Gunnar</div>`
     + quoteHtml() + `</div>`
     + `<div class="body">`
-    + `<div class="capbar" data-cap="1"><span class="p">＋</span> Fang en tanke…</div>`
+    + captureBlock({})
     + `<div class="grid">${tiles}</div></div>`;
 }
 
@@ -75,8 +80,30 @@ function bind(root) {
       if (App.view === 'routines') { App.state = syncRoutines(App.state); saveStateDebounced(App.state); }
       render();
     });
-  const cap = root.querySelector('[data-cap]');
-  if (cap) cap.onclick = () => openSheet(cap.dataset.captype || 'task');
+  const capInput = root.querySelector('#capInput');
+  if (capInput) capInput.oninput = () => { App.cap.text = capInput.value; };
+  const capAdd = root.querySelector('#capAddBtn');
+  if (capAdd) capAdd.onclick = submitCapture;
+  root.querySelectorAll('[data-captype]').forEach((el) =>
+    el.onclick = () => { App.cap.type = el.dataset.captype; render(); });
+  root.querySelectorAll('[data-capinsist]').forEach((el) =>
+    el.onclick = () => { App.cap.insistence = el.dataset.capinsist; render(); });
+  root.querySelectorAll('[data-capcad]').forEach((el) =>
+    el.onclick = () => { App.cap.cadenceDays = Number(el.dataset.capcad); render(); });
+  const editInput = root.querySelector('#editInput');
+  if (editInput) editInput.oninput = () => { App.edit.text = editInput.value; };
+  root.querySelectorAll('[data-edittype]').forEach((el) =>
+    el.onclick = () => { App.edit.type = el.dataset.edittype; render(); });
+  root.querySelectorAll('[data-editinsist]').forEach((el) =>
+    el.onclick = () => { App.edit.insistence = el.dataset.editinsist; render(); });
+  root.querySelectorAll('[data-editcad]').forEach((el) =>
+    el.onclick = () => { App.edit.cadenceDays = Number(el.dataset.editcad); render(); });
+  const eSave = root.querySelector('#editSave');
+  if (eSave) eSave.onclick = saveEdit;
+  const eCancel = root.querySelector('#editCancel');
+  if (eCancel) eCancel.onclick = () => { App.edit = null; render(); };
+  const eDel = root.querySelector('#editDelete');
+  if (eDel) eDel.onclick = deleteFromEdit;
   root.querySelectorAll('[data-home]').forEach((el) =>
     el.onclick = () => { App.view = 'home'; App.catId = null; render(); });
   root.querySelectorAll('[data-rotate]').forEach((el) =>
@@ -142,92 +169,108 @@ const CAPTURE_TYPES = [
   { id: 'someday', label: '💛 Langsiktig' },
   { id: 'note', label: '📝 Notat' },
 ];
+const INSIST_CHIPS = [['chill', '😴 Chill'], ['nudge', '👋 Dult'], ['nag', '📣 Masete']];
 
-function openSheet(prefillType) {
-  App.sheet = { editId: null, text: '', type: prefillType || 'task',
-                insistence: 'chill', cadenceDays: 7 };
-  renderSheet();
+// Felles innmat for både fange- og redigeringsskjema. prefix = 'cap' | 'edit'.
+function insistChips(prefix, m) {
+  if (m.type !== 'someday') return '';
+  const iAttr = 'data-' + prefix + 'insist';
+  const cAttr = 'data-' + prefix + 'cad';
+  let h = `<div class="lab">Hvor mye skal den mase?</div><div class="chips">`
+    + INSIST_CHIPS.map(([k, l]) =>
+        `<span class="chip ${m.insistence === k ? 'on' : ''}" ${iAttr}="${k}">${l}</span>`).join('')
+    + `</div>`;
+  if (m.insistence === 'nudge') {
+    h += `<div class="lab">Kom tilbake hver…</div><div class="chips">`
+      + [3, 7, 14, 30].map((d) =>
+          `<span class="chip ${m.cadenceDays === d ? 'on' : ''}" ${cAttr}="${d}">${d} dager</span>`).join('')
+      + `</div>`;
+  }
+  return h;
 }
+
+// Inline fange-felt. fixedType = låst type (lister); null = vis typevalg (hjem).
+function captureBlock(opts) {
+  const o = opts || {};
+  App.capFixed = o.fixedType || null;
+  App.capStay = !!o.fixedType;
+  const cap = App.cap;
+  const showTypes = !o.fixedType;
+  const typeChips = showTypes
+    ? CAPTURE_TYPES.map((tp) =>
+        `<span class="chip ${cap.type === tp.id ? 'on' : ''}" data-captype="${tp.id}">${tp.label}</span>`).join('')
+    : '';
+  return `<div class="capture card">`
+    + `<textarea class="inp" id="capInput" rows="2" placeholder="${esc(o.placeholder || 'Fang en tanke…')}">${esc(cap.text)}</textarea>`
+    + (showTypes ? `<div class="lab">Hva er dette?</div><div class="chips">${typeChips}</div>` : '')
+    + (showTypes ? insistChips('cap', cap) : '')
+    + `<button class="btn" id="capAddBtn">Legg til</button>`
+    + `</div>`;
+}
+
+function submitCapture() {
+  const cap = App.cap;
+  const text = (cap.text || '').trim();
+  if (!text) return;
+  const type = App.capFixed || cap.type || 'task';
+  const c = ctx();
+  const id = c.id;
+  let next = L.addItem(App.state, { text, type }, c);
+  if (type === 'someday') {
+    next = L.setInsistence(next, { id, insistence: cap.insistence, cadenceDays: cap.cadenceDays },
+                           { now: c.now, id: newId() });
+  }
+  const stay = App.capStay;
+  App.cap = { text: '', type: 'task', insistence: 'chill', cadenceDays: 7 };
+  if (!stay) App.view = { task: 'tasks', someday: 'medium', note: 'notes' }[type] || 'tasks';
+  App.state = next; saveStateDebounced(App.state); render();
+}
+
+// Inline redigering – erstatter raden du redigerer.
+function isEditing(id) { return App.edit && App.edit.id === id; }
+
 function openEdit(id) {
   const it = App.state.items.find((i) => i.id === id);
   if (!it) return;
   const type = ['task', 'someday', 'note'].includes(it.type) ? it.type : 'task';
-  App.sheet = { editId: id, text: it.text || '', type,
-                insistence: it.insistence || 'chill', cadenceDays: it.cadenceDays || 7 };
-  renderSheet();
+  App.edit = { id, text: it.text || '', type,
+               insistence: it.insistence || 'chill', cadenceDays: it.cadenceDays || 7 };
+  render();
 }
-function closeSheet() { App.sheet = null; const o = document.getElementById('ov'); if (o) o.remove(); }
 
-function renderSheet() {
-  const s = App.sheet;
+function editForm() {
+  const e = App.edit;
   const typeChips = CAPTURE_TYPES.map((tp) =>
-    `<span class="chip ${s.type === tp.id ? 'on' : ''}" data-type="${tp.id}">${tp.label}</span>`).join('');
-  const INSIST_CHIPS = [['chill', '😴 Chill'], ['nudge', '👋 Dult'], ['nag', '📣 Masete']];
-  const insistRow = s.type === 'someday'
-    ? `<div class="lab">Hvor mye skal den mase?</div><div class="chips">`
-      + INSIST_CHIPS.map(([k, l]) =>
-          `<span class="chip ${s.insistence === k ? 'on' : ''}" data-insist="${k}">${l}</span>`).join('')
-      + `</div>`
-      + (s.insistence === 'nudge'
-          ? `<div class="lab">Kom tilbake hver…</div><div class="chips">`
-            + [3, 7, 14, 30].map((d) =>
-                `<span class="chip ${s.cadenceDays === d ? 'on' : ''}" data-cad="${d}">${d} dager</span>`).join('')
-            + `</div>`
-          : '')
-    : '';
-  const html = `<div class="overlay" id="ov"><div class="sheet">`
-    + `<textarea class="inp" id="capText" rows="2" placeholder="Hva skal du ikke glemme?">${esc(s.text)}</textarea>`
+    `<span class="chip ${e.type === tp.id ? 'on' : ''}" data-edittype="${tp.id}">${tp.label}</span>`).join('');
+  return `<div class="editrow">`
+    + `<textarea class="inp" id="editInput" rows="2" placeholder="Endre teksten…">${esc(e.text)}</textarea>`
     + `<div class="lab">Hva er dette?</div><div class="chips">${typeChips}</div>`
-    + insistRow
-    + `<button class="btn" id="capSave">${s.editId ? 'Lagre endringer' : 'Lagre'}</button>`
-    + `<button class="btn ghost" id="capCancel">Avbryt</button>`
-    + (s.editId ? `<button class="btn ghost" id="capDelete">Slett</button>` : '')
-    + `</div></div>`;
-  const old = document.getElementById('ov'); if (old) old.remove();
-  document.getElementById('app').insertAdjacentHTML('beforeend', html);
-  bindSheet();
+    + insistChips('edit', e)
+    + `<div class="editacts"><button class="btn" id="editSave">Lagre</button>`
+    + `<button class="mini" id="editCancel">Avbryt</button>`
+    + `<button class="mini danger" id="editDelete">Slett</button></div>`
+    + `</div>`;
 }
 
-function bindSheet() {
-  const o = document.getElementById('ov');
-  const text = o.querySelector('#capText');
-  text.oninput = () => { App.sheet.text = text.value; };
-  o.querySelectorAll('[data-type]').forEach((el) => el.onclick = () => {
-    App.sheet.type = el.dataset.type; renderSheet(); });
-  o.querySelectorAll('[data-insist]').forEach((el) => el.onclick = () => {
-    App.sheet.insistence = el.dataset.insist; renderSheet(); });
-  o.querySelectorAll('[data-cad]').forEach((el) => el.onclick = () => {
-    App.sheet.cadenceDays = Number(el.dataset.cad); renderSheet(); });
-  o.querySelector('#capCancel').onclick = closeSheet;
-  o.querySelector('#capSave').onclick = saveSheet;
-  const del = o.querySelector('#capDelete');
-  if (del) del.onclick = deleteFromSheet;
-}
-
-function deleteFromSheet() {
-  const id = App.sheet.editId;
-  App.sheet = null;
-  commit(L.deleteItem(App.state, { id }, ctx()));
-}
-
-function saveSheet() {
-  const s = App.sheet;
-  if (!s.text.trim()) { closeSheet(); return; }
+function saveEdit() {
+  const e = App.edit;
+  if (!e) return;
+  if (!e.text.trim()) { App.edit = null; render(); return; }
   const c = ctx();
-  const id = s.editId || c.id;
-  let next;
-  if (s.editId) {
-    next = L.setItemText(App.state, { id, text: s.text }, c);
-    next = L.classifyItem(next, { id, type: s.type }, { now: c.now, id: newId() });
-  } else {
-    next = L.addItem(App.state, { text: s.text, type: s.type }, c);
-  }
-  if (s.type === 'someday') {
-    next = L.setInsistence(next, { id, insistence: s.insistence, cadenceDays: s.cadenceDays },
+  const id = e.id;
+  let next = L.setItemText(App.state, { id, text: e.text }, c);
+  next = L.classifyItem(next, { id, type: e.type }, { now: c.now, id: newId() });
+  if (e.type === 'someday') {
+    next = L.setInsistence(next, { id, insistence: e.insistence, cadenceDays: e.cadenceDays },
                            { now: c.now, id: newId() });
   }
-  App.state = next; saveStateDebounced(App.state);
-  closeSheet(); render();
+  App.edit = null; App.state = next; saveStateDebounced(App.state); render();
+}
+
+function deleteFromEdit() {
+  const id = App.edit.id;
+  App.edit = null;
+  commit(L.deleteItem(App.state, { id }, ctx()));
 }
 
 function fmtTime(iso) {
@@ -242,6 +285,7 @@ function fmtDateTime(iso) {
 }
 
 function itemRowHtml(it) {
+  if (isEditing(it.id)) return editForm();
   const now = nowIso();
   const checkable = it.type === 'task' || it.type === 'reminder';
   const chk = checkable
@@ -271,6 +315,7 @@ function headerBar(title) {
 }
 
 function taskRowHtml(it) {
+  if (isEditing(it.id)) return `<div class="card">${editForm()}</div>`;
   const now = nowIso();
   const chk = `<span class="chk ${it.done ? 'on' : ''}" data-done="${it.id}"></span>`;
   const meta = [];
@@ -298,11 +343,12 @@ function renderTasks() {
     : `<p class="sub">Ingen gjøremål nå 🌱</p>`;
   return headerBar('✅ Gjøremål')
     + `<div class="body">`
-    + `<div class="capbar" data-cap="1" data-captype="task"><span class="p">＋</span> Nytt gjøremål…</div>`
+    + captureBlock({ fixedType: 'task', placeholder: 'Nytt gjøremål…' })
     + body + `</div>`;
 }
 
 function noteRowHtml(it) {
+  if (isEditing(it.id)) return editForm();
   return `<div class="row">`
     + `<div class="rtxt" data-edit="${it.id}"><div class="t">${esc(it.text)}</div></div>`
     + `<button class="mini" data-edit="${it.id}">Rediger</button></div>`;
@@ -315,11 +361,12 @@ function renderNotes() {
     : `<p class="sub">Ingen notater 🌱</p>`;
   return headerBar('📝 Notater')
     + `<div class="body">`
-    + `<div class="capbar" data-cap="1" data-captype="note"><span class="p">＋</span> Nytt notat…</div>`
+    + captureBlock({ fixedType: 'note', placeholder: 'Nytt notat…' })
     + body + `</div>`;
 }
 
 function nudgeRowHtml(it) {
+  if (isEditing(it.id)) return editForm();
   return `<div class="row"><span class="chk" data-done="${it.id}"></span>`
     + `<div class="rtxt" data-edit="${it.id}"><div class="t">${esc(it.text)}</div>`
     + `<div class="m">👋 hver ${it.cadenceDays || 7}. dag</div></div>`
@@ -353,6 +400,7 @@ function daysUntil(iso) {
 }
 
 function mediumRowHtml(it) {
+  if (isEditing(it.id)) return editForm();
   const now = nowIso();
   const chk = `<span class="chk ${it.done ? 'on' : ''}" data-done="${it.id}"></span>`;
   const meta = [];
@@ -378,11 +426,12 @@ function renderMedium() {
   if (!body) body = `<p class="sub">Ingenting her ennå. Fang noe som «💛 Langsiktig».</p>`;
   return headerBar('💛 Langsiktig')
     + `<div class="body">`
-    + `<div class="capbar" data-cap="1" data-captype="someday"><span class="p">＋</span> Fang noe til senere…</div>`
+    + captureBlock({ fixedType: 'someday', placeholder: 'Fang noe til senere…' })
     + body + `</div>`;
 }
 
 function konaRowHtml(it) {
+  if (isEditing(it.id)) return editForm();
   return `<div class="row">`
     + `<div class="rtxt" data-edit="${it.id}"><div class="t">${esc(it.text)}</div></div>`
     + `<button class="mini" data-edit="${it.id}">Behandle</button>`
@@ -527,7 +576,7 @@ function bindRoutineEditor() {
 
 function saveRoutineEditor() {
   const e = App.routineEdit;
-  if (!e.title.trim()) { App.routineEdit = null; closeSheet(); return; }
+  if (!e.title.trim()) { App.routineEdit = null; const o = document.getElementById('ov'); if (o) o.remove(); return; }
   const subtasks = (e.subtasks || []).filter((s) => s.text.trim()).map((s) => ({ id: s.id, text: s.text }));
   const payload = { title: e.title, subtasks, weekdays: e.weekdays || [], enabled: e.enabled, leadDay: e.leadDay, sleeping: e.sleeping };
   let next;
