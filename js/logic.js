@@ -40,7 +40,7 @@ export function migrate(state, today) {
 
 function pushLog(out, entry) { out.log.push(entry); }
 
-export function addItem(state, { text, type = null, category = null }, ctx) {
+export function addItem(state, { text, type = null, category = null, source = null }, ctx) {
   const out = clone(state);
   const item = {
     id: ctx.id, text: String(text || '').trim(),
@@ -48,7 +48,7 @@ export function addItem(state, { text, type = null, category = null }, ctx) {
     done: false, doneAt: null,
     due: null, remindAt: null,
     resurfaceAt: null, deferred: false, iosPushedAt: null,
-    source: null, routineId: null, routineDate: null, subtasks: null,
+    source, routineId: null, routineDate: null, subtasks: null,
     insistence: null, cadenceDays: null,
     createdAt: ctx.now, updatedAt: ctx.now, removed: false,
   };
@@ -138,7 +138,24 @@ function dayOf(iso) { return (iso || '').slice(0, 10); }
 
 export function inboxItems(state, now) {
   return activeItems(state).filter((i) =>
-    (i.type == null && isResurfaced(i, now)) || nudgeDue(i, now));
+    (i.type == null && i.source !== 'kona' && isResurfaced(i, now)) || nudgeDue(i, now));
+}
+
+// «Fra kona»: ubehandlet = fra kona, ennå uten type, ikke gjort/gjemt.
+export function isKonaPending(item) {
+  return !!item && !item.removed && !item.done
+    && item.source === 'kona' && item.type == null;
+}
+
+export function konaItems(state) {
+  return activeItems(state)
+    .filter(isKonaPending)
+    .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+}
+
+export function konaBadge(state) {
+  const count = konaItems(state).length;
+  return { count, level: count ? 'open' : 'calm' };
 }
 
 export function itemsForToday(state, now) {

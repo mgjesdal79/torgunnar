@@ -70,6 +70,9 @@
   .btn{display:block;width:100%;text-align:center;background:var(--bamboo);color:#06220d;
     font-weight:800;border:none;border-radius:14px;padding:15px;font-size:15px;margin-top:18px;cursor:pointer}
   .btn.ghost{background:none;border:1px solid var(--line);color:var(--dim);margin-top:8px}
+  .konacap{display:flex;gap:8px;align-items:center;margin:4px 0 14px}
+  .konacap .inp{flex:1;margin:0}
+  .konacap .btn{width:auto;margin:0;white-space:nowrap;padding:14px 18px}
   .rhead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 2px;cursor:pointer}
   .rhead .t{font-weight:700}
   .rhead .sub{margin:0;font-size:12px;white-space:nowrap}
@@ -87,7 +90,7 @@
 <footer class="build" id="build"></footer>
 <script>window.EDGE_FUNCTION_URL = '';</script>
 <script type="module">
-  window.APP_VERSION = '5';
+  window.APP_VERSION = '6';
   window.APP_BUILD = '2026-10-16';
   const b = document.getElementById('build');
   if (b) b.textContent = 'build ' + window.APP_VERSION + ' · ' + window.APP_BUILD;

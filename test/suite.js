@@ -1,5 +1,5 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge } from '../js/logic.js';
-const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge };
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge } from '../js/logic.js';
+const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge };
 
 export function runTests() {
   const results = [];
@@ -484,6 +484,65 @@ export function runTests() {
     s = L.setInsistence(s, { id: 'a', insistence: 'nag' }, { now: 'N' });
     s = L.setInsistence(s, { id: 'b', insistence: 'chill' }, { now: 'N' });
     eq(L.mediumBadge(s), { count: 1, level: 'open' });
+  });
+
+  // === Fra kona ===
+  t('addItem med source=kona setter feltet; uten source → null', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'Handle melk', source: 'kona' }, { now: '2026-10-16T08:00:00.000Z', id: 'k1' });
+    s = addItem(s, { text: 'Egen tanke' }, { now: '2026-10-16T08:00:01.000Z', id: 'n1' });
+    eq(s.items.find((i) => i.id === 'k1').source, 'kona');
+    eq(s.items.find((i) => i.id === 'n1').source, null);
+  });
+  t('konaItems: kun ubehandlede kona-lapper, nyeste først', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'Eldst', source: 'kona' }, { now: '2026-10-16T08:00:00.000Z', id: 'k1' });
+    s = addItem(s, { text: 'Nyest', source: 'kona' }, { now: '2026-10-16T08:00:02.000Z', id: 'k2' });
+    s = addItem(s, { text: 'Ikke kona' }, { now: '2026-10-16T08:00:01.000Z', id: 'n1' });
+    eq(L.konaItems(s).map((i) => i.id), ['k2', 'k1']);
+  });
+  t('konaItems utelater behandlede (fått type)', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'Handle melk', source: 'kona' }, { now: '2026-10-16T08:00:00.000Z', id: 'k1' });
+    s = classifyItem(s, { id: 'k1', type: 'task' }, { now: 'N' });
+    eq(L.konaItems(s).length, 0);
+  });
+  t('konaItems utelater done og removed', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'A', source: 'kona' }, { now: '2026-10-16T08:00:00.000Z', id: 'a' });
+    s = addItem(s, { text: 'B', source: 'kona' }, { now: '2026-10-16T08:00:01.000Z', id: 'b' });
+    s = deleteItem(s, { id: 'a' }, { now: 'N' });
+    s = completeItem(s, { id: 'b' }, { now: 'N' });
+    eq(L.konaItems(s).length, 0);
+  });
+  t('isKonaPending', () => {
+    ok(L.isKonaPending({ source: 'kona', type: null }));
+    ok(!L.isKonaPending({ source: 'kona', type: 'task' }));
+    ok(!L.isKonaPending({ source: null, type: null }));
+    ok(!L.isKonaPending({ source: 'kona', type: null, done: true }));
+    ok(!L.isKonaPending({ source: 'kona', type: null, removed: true }));
+    ok(!L.isKonaPending(null));
+  });
+  t('konaBadge teller ubehandlede', () => {
+    let s = defaultState();
+    eq(L.konaBadge(s), { count: 0, level: 'calm' });
+    s = addItem(s, { text: 'A', source: 'kona' }, { now: '2026-10-16T08:00:00.000Z', id: 'a' });
+    s = addItem(s, { text: 'B', source: 'kona' }, { now: '2026-10-16T08:00:01.000Z', id: 'b' });
+    eq(L.konaBadge(s), { count: 2, level: 'open' });
+  });
+  t('inboxItems ekskluderer kona, beholder vanlige untypede', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'Kona-lapp', source: 'kona' }, { now: '2026-10-16T08:00:00.000Z', id: 'k1' });
+    s = addItem(s, { text: 'Egen tanke' }, { now: '2026-10-16T08:00:01.000Z', id: 'n1' });
+    const ids = inboxItems(s, '2026-10-16T09:00:00.000Z').map((i) => i.id);
+    eq(ids, ['n1']);
+  });
+  t('konvertering flytter kona-lapp fra konaItems til mediumItems', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'Planlegg ferie', source: 'kona' }, { now: '2026-10-16T08:00:00.000Z', id: 'k1' });
+    s = classifyItem(s, { id: 'k1', type: 'someday' }, { now: 'N' });
+    eq(L.konaItems(s).length, 0);
+    eq(L.mediumItems(s).map((i) => i.id), ['k1']);
   });
 
   return results;

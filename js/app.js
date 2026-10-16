@@ -39,7 +39,9 @@ function renderHome() {
   const inboxN = L.inboxItems(App.state, now).length;
   const todayN = L.itemsForToday(App.state, now).length;
   const mediumN = L.mediumBadge(App.state);
+  const konaN = L.konaBadge(App.state);
   const special = tileHtml('💛', 'På et tidspunkt', mediumN, 'data-view="medium"')
+    + tileHtml('💬', 'Fra kona', konaN, 'data-view="kona"')
     + tileHtml('📥', 'Innboks', { count: inboxN, level: inboxN ? 'hot' : 'calm' }, 'data-view="inbox"')
     + tileHtml('📌', 'I dag', { count: todayN, level: todayN ? 'open' : 'calm' }, 'data-view="today"')
     + tileHtml('🔁', 'Rutiner', null, 'data-view="routines"')
@@ -58,6 +60,7 @@ function render() {
   else if (v === 'inbox') root.innerHTML = renderInbox();
   else if (v === 'today') root.innerHTML = renderToday();
   else if (v === 'medium') root.innerHTML = renderMedium();
+  else if (v === 'kona') root.innerHTML = renderKona();
   else if (v === 'routines') root.innerHTML = renderRoutines();
   else if (v === 'settings') root.innerHTML = renderSettings();
   else root.innerHTML = renderHome();
@@ -102,6 +105,19 @@ function bind(root) {
     el.onclick = () => commit(L.promoteToToday(App.state, { id: el.dataset.promote }, ctx())));
   root.querySelectorAll('[data-msnooze]').forEach((el) =>
     el.onclick = () => commit(L.snoozeNudge(App.state, { id: el.dataset.msnooze }, ctx())));
+  root.querySelectorAll('[data-kdismiss]').forEach((el) =>
+    el.onclick = () => commit(L.deleteItem(App.state, { id: el.dataset.kdismiss }, ctx())));
+  const konaAdd = root.querySelector('#konaAdd');
+  if (konaAdd) {
+    const inp = root.querySelector('#konaText');
+    const add = () => {
+      const text = (inp.value || '').trim();
+      if (!text) return;
+      commit(L.addItem(App.state, { text, source: 'kona' }, ctx()));
+    };
+    konaAdd.onclick = add;
+    inp.onkeydown = (ev) => { if (ev.key === 'Enter') add(); };
+  }
 }
 
 const TYPES = [
@@ -331,6 +347,26 @@ function renderMedium() {
     + `<div class="body">`
     + `<div class="capbar" data-cap="1" data-captype="someday"><span class="p">＋</span> Fang noe til senere…</div>`
     + body + `</div>`;
+}
+
+function konaRowHtml(it) {
+  return `<div class="row">`
+    + `<div class="rtxt" data-edit="${it.id}"><div class="t">${esc(it.text)}</div></div>`
+    + `<button class="mini" data-edit="${it.id}">Behandle</button>`
+    + `<button class="mini" data-kdismiss="${it.id}">✕</button></div>`;
+}
+
+function renderKona() {
+  const items = L.konaItems(App.state);
+  const list = items.length
+    ? `<div class="card">${items.map(konaRowHtml).join('')}</div>`
+    : `<p class="sub">Ingen lapper fra kona akkurat nå 🌱</p>`;
+  return headerBar('💬 Fra kona')
+    + `<div class="body">`
+    + `<p class="sub">Legg igjen en beskjed til Tor Gunnar. Han triagerer dem selv.</p>`
+    + `<div class="konacap"><input class="inp" id="konaText" placeholder="Skriv en lapp…">`
+    + `<button class="btn" id="konaAdd">Legg til</button></div>`
+    + list + `</div>`;
 }
 
 const WD = [['mon', 'Man'], ['tue', 'Tir'], ['wed', 'Ons'], ['thu', 'Tor'], ['fri', 'Fre'], ['sat', 'Lør'], ['sun', 'Søn']];
