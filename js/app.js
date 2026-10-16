@@ -120,6 +120,8 @@ function bind(root) {
     el.onclick = () => doComplete(el.dataset.done, el));
   root.querySelectorAll('[data-defer]').forEach((el) =>
     el.onclick = () => openDefer(el.dataset.defer));
+  root.querySelectorAll('[data-undefer]').forEach((el) =>
+    el.onclick = () => commit(L.undeferItem(App.state, { id: el.dataset.undefer }, ctx())));
   root.querySelectorAll('[data-edit]').forEach((el) =>
     el.onclick = () => openEdit(el.dataset.edit));
   root.querySelectorAll('[data-rtoggle]').forEach((el) =>
@@ -380,15 +382,30 @@ function renderTasks() {
     + body + `</div>`;
 }
 
+function deferredJobRowHtml(it) {
+  if (isEditing(it.id)) return editForm();
+  const back = it.resurfaceAt ? fmtDateTime(it.resurfaceAt) : '';
+  return `<div class="row">`
+    + `<div class="rtxt" data-edit="${it.id}"><div class="t">${esc(it.text)}</div>`
+    + (back ? `<div class="m">💤 tilbake ${esc(back)}</div>` : '')
+    + `</div>`
+    + `<button class="mini" data-undefer="${it.id}">Hent frem</button></div>`;
+}
+
 function renderJob() {
-  const items = L.jobItems(App.state, nowIso());
+  const now = nowIso();
+  const items = L.jobItems(App.state, now);
+  const deferred = L.deferredJobItems(App.state, now);
   const body = items.length
     ? items.map(taskRowHtml).join('')
     : `<p class="sub">Ingen jobb-gjøremål nå 🌱</p>`;
+  const deferredCard = deferred.length
+    ? `<h2>💤 Utsatt</h2><div class="card">${deferred.map(deferredJobRowHtml).join('')}</div>`
+    : '';
   return headerBar('💼 Jobb')
     + `<div class="body">`
     + captureBlock({ fixedType: 'job', placeholder: 'Nytt jobb-gjøremål…' })
-    + body + `</div>`;
+    + body + deferredCard + `</div>`;
 }
 
 function noteRowHtml(it) {

@@ -223,6 +223,14 @@ export function jobItems(state, now) {
     });
 }
 
+// Utsatte jobber (deferred, ennå ikke tilbake). Jobb holdes utenfor «I dag»,
+// så disse trenger et eget synlig sted så de ikke forsvinner sporløst.
+export function deferredJobItems(state, now) {
+  return activeItems(state)
+    .filter((i) => i.type === 'job' && !i.done && i.deferred && !isResurfaced(i, now))
+    .sort((a, b) => (a.resurfaceAt || '').localeCompare(b.resurfaceAt || ''));
+}
+
 export function noteItems(state) {
   return activeItems(state)
     .filter((i) => i.type === 'note')
