@@ -1,5 +1,5 @@
-const VERSION = '3';
-const CACHE = 'pandacoins-v' + VERSION;
+const VERSION = '4';
+const CACHE = 'torgunnar-v' + VERSION;
 const SHELL = [
   './', './index.html', './manifest.json',
   './js/logic.js', './js/store.js', './js/app.js',

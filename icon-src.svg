@@ -1,13 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <rect x="0" y="0" width="512" height="512" fill="#5fbf74"/>
-  <circle cx="182" cy="140" r="50" fill="#1a1a1a"/>
-  <circle cx="330" cy="140" r="50" fill="#1a1a1a"/>
-  <circle cx="256" cy="278" r="150" fill="#ffffff"/>
-  <ellipse cx="212" cy="268" rx="38" ry="50" fill="#1a1a1a" transform="rotate(-18 212 268)"/>
-  <ellipse cx="300" cy="268" rx="38" ry="50" fill="#1a1a1a" transform="rotate(18 300 268)"/>
-  <circle cx="218" cy="260" r="15" fill="#ffffff"/>
-  <circle cx="220" cy="262" r="8" fill="#1a1a1a"/>
-  <circle cx="294" cy="260" r="15" fill="#ffffff"/>
-  <circle cx="292" cy="262" r="8" fill="#1a1a1a"/>
-  <ellipse cx="256" cy="330" rx="20" ry="13" fill="#1a1a1a"/>
+  <!-- Tor Gunnar placeholder-ikon: superhelt-domino-maske. Bytt hele fila + kjor tools/gen-icons.sh. -->
+  <rect width="512" height="512" fill="#5fbf74"/>
+  <ellipse cx="188" cy="256" rx="126" ry="100" fill="#1b1f3b"/>
+  <ellipse cx="324" cy="256" rx="126" ry="100" fill="#1b1f3b"/>
+  <ellipse cx="190" cy="250" rx="60" ry="30" fill="#5fbf74" transform="rotate(-20 190 250)"/>
+  <ellipse cx="322" cy="250" rx="60" ry="30" fill="#5fbf74" transform="rotate(20 322 250)"/>
 </svg>

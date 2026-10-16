@@ -1,7 +1,8 @@
 import { defaultState, migrate, mergeState } from './logic.js';
 
 const ROOM = (location.hash.match(/r=([\w-]+)/) || [])[1] || 'local';
-const KEY = 'pandacoins:' + ROOM;
+const KEY = 'torgunnar:' + ROOM;
+const OLD_KEY = 'pandacoins:' + ROOM; // migrering: les gammel data hvis ny mangler
 
 export function nowIso() { return new Date().toISOString(); }
 export function todayIso() { return nowIso().slice(0, 10); }
@@ -12,7 +13,7 @@ export function newId() {
 export function loadState() {
   let local = defaultState();
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(KEY) || localStorage.getItem(OLD_KEY);
     if (raw) local = mergeState(defaultState(), JSON.parse(raw));
   } catch (e) { /* korrupt cache → default */ }
   return migrate(local, todayIso());

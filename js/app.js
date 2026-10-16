@@ -42,7 +42,7 @@ function renderHome() {
     + tileHtml('📌', 'I dag', { count: todayN, level: todayN ? 'open' : 'calm' }, 'data-view="today"')
     + tileHtml('🔁', 'Rutiner', null, 'data-view="routines"')
     + tileHtml('⚙️', 'Innstillinger', null, 'data-view="settings"');
-  return `<div class="banner"><div class="b">🐼 PandaCoins</div>`
+  return `<div class="banner"><div class="b">🦸‍♂️ Tor Gunnar</div>`
     + `<div class="status">${esc(statusLine())}</div></div>`
     + `<div class="body">`
     + `<div class="capbar" data-cap="1"><span class="p">＋</span> Fang en tanke…</div>`
