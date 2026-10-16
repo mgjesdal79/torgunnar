@@ -270,11 +270,26 @@ function renderCategory() {
     + `</div>`;
 }
 
+function nudgeRowHtml(it) {
+  return `<div class="row"><span class="chk" data-done="${it.id}"></span>`
+    + `<div class="rtxt" data-edit="${it.id}"><div class="t">${esc(it.text)}</div>`
+    + `<div class="m">👋 hver ${it.cadenceDays || 7}. dag</div></div>`
+    + `<button class="mini" data-promote="${it.id}">I dag</button>`
+    + `<button class="mini" data-msnooze="${it.id}">Dult igjen</button></div>`;
+}
+
 function renderInbox() {
-  const items = L.inboxItems(App.state, nowIso());
+  const now = nowIso();
+  const all = L.inboxItems(App.state, now);
+  const nudge = all.filter((i) => L.nudgeDue(i, now));
+  const fresh = all.filter((i) => i.type == null);
+  const freshCard = fresh.length ? listCard(fresh) : (nudge.length ? '' : `<p class="sub">Innboksen er tom 🌱</p>`);
+  const nudgeCard = nudge.length
+    ? `<h2>👋 Dult – på tide igjen?</h2><div class="card">${nudge.map(nudgeRowHtml).join('')}</div>`
+    : '';
   return headerBar('📥 Innboks')
-    + `<div class="body"><p class="sub">Fanget uten type. Trykk for å klassifisere eller slette.</p>`
-    + listCard(items) + `</div>`;
+    + `<div class="body"><p class="sub">Fanget uten type, og saker på sikt som melder seg igjen.</p>`
+    + freshCard + nudgeCard + `</div>`;
 }
 
 function renderToday() {
