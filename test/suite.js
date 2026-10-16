@@ -1,4 +1,5 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso } from '../js/logic.js';
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance } from '../js/logic.js';
+const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate };
 
 export function runTests() {
   const results = [];
@@ -263,6 +264,147 @@ export function runTests() {
   t('addMinutesIso legger til minutter', () => {
     eq(addMinutesIso('2026-10-13T08:00:00.000Z', 60), '2026-10-13T09:00:00.000Z');
     eq(addMinutesIso('2026-10-13T08:00:00.000Z', 180), '2026-10-13T11:00:00.000Z');
+  });
+
+  // ---- Rutiner: datamodell ----
+  t('defaultState har routineInstances-array', () => {
+    ok(Array.isArray(L.defaultState().routineInstances));
+  });
+  t('weekdayKey gir riktig ukedag', () => {
+    eq(L.weekdayKey('2026-10-16'), 'fri'); // 16. okt 2026 er fredag
+    eq(L.weekdayKey('2026-10-18'), 'sun');
+  });
+  t('addDaysIso legger til dager uten TZ-sprang', () => {
+    eq(L.addDaysIso('2026-10-16', 1), '2026-10-17');
+    eq(L.addDaysIso('2026-10-31', 1), '2026-11-01');
+  });
+  t('migrate initialiserer og rydder gamle routineInstances', () => {
+    const s = L.defaultState();
+    s.routineInstances = [
+      { id: 'a:2026-10-10', date: '2026-10-10' },
+      { id: 'a:2026-10-16', date: '2026-10-16' },
+    ];
+    const m = L.migrate(s, '2026-10-16');
+    eq(m.routineInstances.length, 1);
+    eq(m.routineInstances[0].date, '2026-10-16');
+  });
+  t('mergeState forener routineInstances per id (LWW)', () => {
+    const a = L.defaultState(); a.routineInstances = [{ id: 'x', updatedAt: '2026-10-16T08:00:00Z', v: 1 }];
+    const b = L.defaultState(); b.routineInstances = [{ id: 'x', updatedAt: '2026-10-16T09:00:00Z', v: 2 }, { id: 'y', updatedAt: '2026-10-16T09:00:00Z' }];
+    const m = L.mergeState(a, b);
+    const x = m.routineInstances.find((i) => i.id === 'x');
+    eq(x.v, 2);
+    eq(m.routineInstances.length, 2);
+  });
+
+  // ---- Rutiner: mal-CRUD ----
+  t('addRoutine legger til mal med standardverdier', () => {
+    const s = L.addRoutine(L.defaultState(), { routine: { title: 'Kveldssjekk', subtasks: [{ text: 'Lås dør' }], weekdays: ['mon'] } }, { now: 'N', id: 'r1' });
+    const r = s.settings.routines[0];
+    eq(r.id, 'r1'); eq(r.title, 'Kveldssjekk');
+    eq(r.enabled, true); eq(r.sleeping, false); eq(r.leadDay, false);
+    eq(r.subtasks.length, 1); ok(r.subtasks[0].id);
+    eq(s.settings.updatedAt, 'N');
+  });
+  t('updateRoutine patcher og bumper updatedAt', () => {
+    let s = L.addRoutine(L.defaultState(), { routine: { title: 'A' } }, { now: 'N1', id: 'r1' });
+    s = L.updateRoutine(s, { id: 'r1', patch: { title: 'B', sleeping: true } }, { now: 'N2', id: 'x' });
+    eq(s.settings.routines[0].title, 'B');
+    eq(s.settings.routines[0].sleeping, true);
+    eq(s.settings.routines[0].updatedAt, 'N2');
+  });
+  t('deleteRoutine fjerner mal og dens instanser', () => {
+    let s = L.addRoutine(L.defaultState(), { routine: { title: 'A' } }, { now: 'N', id: 'r1' });
+    s.routineInstances = [{ id: 'r1:2026-10-16', routineId: 'r1', date: '2026-10-16' }];
+    s = L.deleteRoutine(s, { id: 'r1' }, { now: 'N2', id: 'x' });
+    eq(s.settings.routines.length, 0);
+    eq(s.routineInstances.length, 0);
+  });
+  t('updateRoutine på ukjent id returnerer uendret', () => {
+    const s0 = L.defaultState();
+    const s1 = L.updateRoutine(s0, { id: 'nope', patch: { title: 'X' } }, { now: 'N', id: 'x' });
+    eq(s1, s0);
+  });
+
+  // ---- Rutiner: generering/vekking/rydding ----
+  function routineState() {
+    return L.addRoutine(L.defaultState(), { routine: { title: 'Kveld', subtasks: [{ text: 'Lås' }], weekdays: ['fri'] } }, { now: 'N', id: 'r1' });
+  }
+  t('generateRoutineInstances lager instans på matchende ukedag', () => {
+    const s = L.generateRoutineInstances(routineState(), '2026-10-16', { now: 'N' }); // fredag
+    eq(s.routineInstances.length, 1);
+    eq(s.routineInstances[0].id, 'r1:2026-10-16');
+    eq(s.routineInstances[0].subtasks[0].done, false);
+  });
+  t('generateRoutineInstances lager ingenting på ikke-matchende dag', () => {
+    const s = L.generateRoutineInstances(routineState(), '2026-10-17', { now: 'N' }); // lørdag
+    eq(s.routineInstances.length, 0);
+  });
+  t('generateRoutineInstances er idempotent', () => {
+    let s = L.generateRoutineInstances(routineState(), '2026-10-16', { now: 'N' });
+    s = L.generateRoutineInstances(s, '2026-10-16', { now: 'N' });
+    eq(s.routineInstances.length, 1);
+  });
+  t('leadDay lager også morgendagens instans', () => {
+    let s = L.addRoutine(L.defaultState(), { routine: { title: 'Man', weekdays: ['mon'], leadDay: true } }, { now: 'N', id: 'r1' });
+    s = L.generateRoutineInstances(s, '2026-10-18', { now: 'N' }); // søndag, i morgen = mandag
+    ok(s.routineInstances.some((i) => i.id === 'r1:2026-10-19'));
+  });
+  t('sovende maler genereres ikke automatisk', () => {
+    let s = L.addRoutine(L.defaultState(), { routine: { title: 'S', weekdays: ['fri'], sleeping: true } }, { now: 'N', id: 'r1' });
+    s = L.generateRoutineInstances(s, '2026-10-16', { now: 'N' });
+    eq(s.routineInstances.length, 0);
+  });
+  t('wakeRoutine materialiserer instans for i dag', () => {
+    let s = L.addRoutine(L.defaultState(), { routine: { title: 'S', sleeping: true, subtasks: [{ text: 'X' }] } }, { now: 'N', id: 'r1' });
+    s = L.wakeRoutine(s, { id: 'r1', date: '2026-10-16' }, { now: 'N2' });
+    eq(s.routineInstances.length, 1);
+    eq(s.routineInstances[0].id, 'r1:2026-10-16');
+  });
+  t('routineInstancesForDate skjuler skippede', () => {
+    let s = L.wakeRoutine(L.addRoutine(L.defaultState(), { routine: { title: 'S', sleeping: true } }, { now: 'N', id: 'r1' }), { id: 'r1', date: '2026-10-16' }, { now: 'N2' });
+    eq(L.routineInstancesForDate(s, '2026-10-16').length, 1);
+    s.routineInstances[0].skipped = true;
+    eq(L.routineInstancesForDate(s, '2026-10-16').length, 0);
+  });
+  t('pruneRoutineInstances dropper gamle datoer', () => {
+    const s = L.defaultState();
+    s.routineInstances = [{ id: 'a', date: '2026-10-10' }, { id: 'b', date: '2026-10-16' }];
+    const p = L.pruneRoutineInstances(s, '2026-10-16');
+    eq(p.routineInstances.length, 1);
+  });
+
+  // ---- Rutiner: avkryssing ----
+  function wokenInst() {
+    const s = L.addRoutine(L.defaultState(), { routine: { title: 'S', sleeping: true, subtasks: [{ id: 'a', text: 'A' }, { id: 'b', text: 'B' }] } }, { now: 'N', id: 'r1' });
+    return L.wakeRoutine(s, { id: 'r1', date: '2026-10-16' }, { now: 'N2' });
+  }
+  t('toggleRoutineSubtask huker av og setter done når alt er gjort', () => {
+    let s = wokenInst();
+    const iid = 'r1:2026-10-16';
+    s = L.toggleRoutineSubtask(s, { instanceId: iid, subId: 'a' }, { now: 'N3' });
+    eq(s.routineInstances[0].done, false);
+    s = L.toggleRoutineSubtask(s, { instanceId: iid, subId: 'b' }, { now: 'N4' });
+    eq(s.routineInstances[0].done, true);
+    eq(s.routineInstances[0].doneAt, 'N4');
+  });
+  t('toggleRoutineSubtask av igjen nullstiller done', () => {
+    let s = wokenInst();
+    const iid = 'r1:2026-10-16';
+    s = L.toggleRoutineSubtask(s, { instanceId: iid, subId: 'a' }, { now: 'N3' });
+    s = L.toggleRoutineSubtask(s, { instanceId: iid, subId: 'b' }, { now: 'N4' });
+    s = L.toggleRoutineSubtask(s, { instanceId: iid, subId: 'a' }, { now: 'N5' });
+    eq(s.routineInstances[0].done, false);
+    eq(s.routineInstances[0].doneAt, null);
+  });
+  t('allSubtasksDone: tom liste er ikke done', () => {
+    eq(L.allSubtasksDone({ subtasks: [] }), false);
+    eq(L.allSubtasksDone({ subtasks: [{ done: true }] }), true);
+  });
+  t('skipRoutineInstance markerer skipped', () => {
+    let s = wokenInst();
+    s = L.skipRoutineInstance(s, { instanceId: 'r1:2026-10-16' }, { now: 'N3' });
+    eq(s.routineInstances[0].skipped, true);
   });
 
   return results;

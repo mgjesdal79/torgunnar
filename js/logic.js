@@ -20,6 +20,7 @@ export function defaultState() {
     items: [],
     checkRuns: {},
     log: [],
+    routineInstances: [],
   };
 }
 
@@ -32,6 +33,8 @@ export function migrate(state, today) {
   if (!out.checkRuns || typeof out.checkRuns !== 'object') out.checkRuns = {};
   if (!Array.isArray(out.log)) out.log = [];
   out.log = out.log.slice(-LOG_KEEP);
+  if (!Array.isArray(out.routineInstances)) out.routineInstances = [];
+  if (today) out.routineInstances = out.routineInstances.filter((i) => i.date >= today);
   return out;
 }
 
@@ -224,6 +227,9 @@ export function mergeState(local, remote) {
   // items LWW per id
   out.items = mergeListById(local.items, remote.items,
     (c, x) => ((x.updatedAt || '') >= (c.updatedAt || '') ? x : c));
+  // routineInstances LWW per id
+  out.routineInstances = mergeListById(local.routineInstances, remote.routineInstances,
+    (c, x) => ((x.updatedAt || '') >= (c.updatedAt || '') ? x : c));
   // checkRuns: union datoer, per-item LWW på .at
   out.checkRuns = clone(local.checkRuns || {});
   const rc = remote.checkRuns || {};
@@ -249,4 +255,141 @@ export function pruneLog(state, keep = LOG_KEEP) {
 
 export function addMinutesIso(iso, minutes) {
   return new Date(new Date(iso).getTime() + minutes * 60000).toISOString();
+}
+
+// ---- Rutiner: dato-hjelpere ----
+const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+export function weekdayKey(dateStr) {
+  return WEEKDAYS[new Date(dateStr + 'T12:00:00').getDay()];
+}
+export function addDaysIso(dateStr, n) {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+// ---- Rutiner: mal-CRUD ----
+export function addRoutine(state, { routine }, ctx) {
+  const out = clone(state);
+  const r = routine || {};
+  out.settings.routines.push({
+    id: ctx.id,
+    title: String(r.title || '').trim(),
+    subtasks: (r.subtasks || []).map((s, i) => ({
+      id: s.id || (ctx.id + ':s' + i), text: String(s.text || '').trim(),
+    })),
+    weekdays: Array.isArray(r.weekdays) ? r.weekdays.slice() : [],
+    enabled: r.enabled !== false,
+    leadDay: !!r.leadDay,
+    sleeping: !!r.sleeping,
+    updatedAt: ctx.now,
+  });
+  bumpSettings(out, ctx);
+  return out;
+}
+
+export function updateRoutine(state, { id, patch }, ctx) {
+  const out = clone(state);
+  const r = out.settings.routines.find((x) => x.id === id);
+  if (!r) return state;
+  Object.assign(r, patch);
+  r.updatedAt = ctx.now;
+  bumpSettings(out, ctx);
+  return out;
+}
+
+export function deleteRoutine(state, { id }, ctx) {
+  const out = clone(state);
+  const before = out.settings.routines.length;
+  out.settings.routines = out.settings.routines.filter((x) => x.id !== id);
+  if (out.settings.routines.length === before) return state;
+  out.routineInstances = (out.routineInstances || []).filter((i) => i.routineId !== id);
+  bumpSettings(out, ctx);
+  return out;
+}
+
+// ---- Rutiner: instanser ----
+function makeInstance(r, date, ctx) {
+  return {
+    id: r.id + ':' + date,
+    routineId: r.id,
+    date,
+    title: r.title,
+    subtasks: (r.subtasks || []).map((s) => ({ id: s.id, text: s.text, done: false })),
+    done: false, doneAt: null, skipped: false,
+    createdAt: ctx.now, updatedAt: ctx.now,
+  };
+}
+function ensureInstance(out, r, date, ctx) {
+  const id = r.id + ':' + date;
+  if ((out.routineInstances || []).some((i) => i.id === id)) return;
+  out.routineInstances.push(makeInstance(r, date, ctx));
+}
+
+export function generateRoutineInstances(state, today, ctx) {
+  const out = clone(state);
+  if (!Array.isArray(out.routineInstances)) out.routineInstances = [];
+  const tomorrow = addDaysIso(today, 1);
+  const twk = weekdayKey(today);
+  const mwk = weekdayKey(tomorrow);
+  (out.settings.routines || []).forEach((r) => {
+    if (!r.enabled || r.sleeping) return;
+    const wd = r.weekdays || [];
+    if (wd.includes(twk)) ensureInstance(out, r, today, ctx);
+    if (r.leadDay && wd.includes(mwk)) ensureInstance(out, r, tomorrow, ctx);
+  });
+  return out;
+}
+
+export function wakeRoutine(state, { id, date }, ctx) {
+  const out = clone(state);
+  if (!Array.isArray(out.routineInstances)) out.routineInstances = [];
+  const r = (out.settings.routines || []).find((x) => x.id === id);
+  if (!r) return state;
+  const d = date || (ctx.now || '').slice(0, 10);
+  const existing = out.routineInstances.find((i) => i.id === r.id + ':' + d);
+  if (existing) { existing.skipped = false; existing.updatedAt = ctx.now; return out; }
+  out.routineInstances.push(makeInstance(r, d, ctx));
+  return out;
+}
+
+export function routineInstancesForDate(state, date) {
+  return (state.routineInstances || []).filter((i) => i.date === date && !i.skipped);
+}
+
+export function pruneRoutineInstances(state, today) {
+  const out = clone(state);
+  out.routineInstances = (out.routineInstances || []).filter((i) => i.date >= today);
+  return out;
+}
+
+export function sleepingRoutines(state) {
+  return (state.settings.routines || []).filter((r) => r.sleeping);
+}
+
+// ---- Rutiner: avkryssing ----
+export function allSubtasksDone(inst) {
+  const subs = (inst && inst.subtasks) || [];
+  return subs.length > 0 && subs.every((s) => s.done);
+}
+
+export function toggleRoutineSubtask(state, { instanceId, subId }, ctx) {
+  const out = clone(state);
+  const inst = (out.routineInstances || []).find((i) => i.id === instanceId);
+  if (!inst) return state;
+  const sub = (inst.subtasks || []).find((s) => s.id === subId);
+  if (!sub) return state;
+  sub.done = !sub.done;
+  inst.done = allSubtasksDone(inst);
+  inst.doneAt = inst.done ? ctx.now : null;
+  inst.updatedAt = ctx.now;
+  return out;
+}
+
+export function skipRoutineInstance(state, { instanceId }, ctx) {
+  const out = clone(state);
+  const inst = (out.routineInstances || []).find((i) => i.id === instanceId);
+  if (!inst) return state;
+  inst.skipped = true; inst.updatedAt = ctx.now;
+  return out;
 }

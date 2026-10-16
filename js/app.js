@@ -1,10 +1,17 @@
 import * as L from './logic.js';
-import { loadState, saveStateDebounced, nowIso, newId } from './store.js';
+import { loadState, saveStateDebounced, nowIso, todayIso, newId } from './store.js';
 
-const App = { view: 'home', catId: null, sheet: null, state: null };
+const App = { view: 'home', catId: null, sheet: null, state: null, rOpen: {}, routineEdit: null };
 
 function ctx() { return { now: nowIso(), id: newId() }; }
 function commit(next) { App.state = next; saveStateDebounced(App.state); render(); }
+
+function syncRoutines(s) {
+  const today = todayIso();
+  let next = L.pruneRoutineInstances(s, today);
+  next = L.generateRoutineInstances(next, today, ctx());
+  return next;
+}
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"]/g, (c) =>
@@ -33,6 +40,7 @@ function renderHome() {
   const todayN = L.itemsForToday(App.state, now).length;
   const special = tileHtml('📥', 'Innboks', { count: inboxN, level: inboxN ? 'hot' : 'calm' }, 'data-view="inbox"')
     + tileHtml('📌', 'I dag', { count: todayN, level: todayN ? 'open' : 'calm' }, 'data-view="today"')
+    + tileHtml('🔁', 'Rutiner', null, 'data-view="routines"')
     + tileHtml('⚙️', 'Innstillinger', null, 'data-view="settings"');
   return `<div class="banner"><div class="b">🐼 PandaCoins</div>`
     + `<div class="status">${esc(statusLine())}</div></div>`
@@ -47,6 +55,7 @@ function render() {
   if (v === 'category') root.innerHTML = renderCategory();
   else if (v === 'inbox') root.innerHTML = renderInbox();
   else if (v === 'today') root.innerHTML = renderToday();
+  else if (v === 'routines') root.innerHTML = renderRoutines();
   else if (v === 'settings') root.innerHTML = renderSettings();
   else root.innerHTML = renderHome();
   bind(root);
@@ -56,7 +65,11 @@ function bind(root) {
   root.querySelectorAll('[data-cat]').forEach((el) =>
     el.onclick = () => { App.view = 'category'; App.catId = el.dataset.cat; render(); });
   root.querySelectorAll('[data-view]').forEach((el) =>
-    el.onclick = () => { App.view = el.dataset.view; render(); });
+    el.onclick = () => {
+      App.view = el.dataset.view;
+      if (App.view === 'routines') { App.state = syncRoutines(App.state); saveStateDebounced(App.state); }
+      render();
+    });
   const cap = root.querySelector('[data-cap]');
   if (cap) cap.onclick = () => openSheet(null);
   root.querySelectorAll('[data-home]').forEach((el) =>
@@ -67,6 +80,21 @@ function bind(root) {
     el.onclick = () => openDefer(el.dataset.defer));
   root.querySelectorAll('[data-edit]').forEach((el) =>
     el.onclick = () => openEdit(el.dataset.edit));
+  root.querySelectorAll('[data-rtoggle]').forEach((el) =>
+    el.onclick = () => { const id = el.dataset.rtoggle; App.rOpen[id] = !App.rOpen[id]; render(); });
+  root.querySelectorAll('[data-rsub]').forEach((el) =>
+    el.onclick = () => {
+      const [instanceId, subId] = el.dataset.rsub.split('|');
+      commit(L.toggleRoutineSubtask(App.state, { instanceId, subId }, ctx()));
+    });
+  root.querySelectorAll('[data-rskip]').forEach((el) =>
+    el.onclick = () => commit(L.skipRoutineInstance(App.state, { instanceId: el.dataset.rskip }, ctx())));
+  root.querySelectorAll('[data-rwake]').forEach((el) =>
+    el.onclick = () => commit(L.wakeRoutine(App.state, { id: el.dataset.rwake, date: todayIso() }, ctx())));
+  root.querySelectorAll('[data-rnew]').forEach((el) =>
+    el.onclick = () => openRoutineEditor(null));
+  root.querySelectorAll('[data-redit]').forEach((el) =>
+    el.onclick = () => openRoutineEditor(el.dataset.redit));
 }
 
 const TYPES = [
@@ -224,6 +252,143 @@ function renderToday() {
     + `<div class="body"><p class="sub">Det som krever deg nå.</p>` + listCard(items) + `</div>`;
 }
 
+const WD = [['mon', 'Man'], ['tue', 'Tir'], ['wed', 'Ons'], ['thu', 'Tor'], ['fri', 'Fre'], ['sat', 'Lør'], ['sun', 'Søn']];
+const WD_LABEL = {}; WD.forEach(([k, l]) => { WD_LABEL[k] = l; });
+
+function instCardHtml(inst) {
+  const subs = inst.subtasks || [];
+  const n = subs.length;
+  const d = subs.filter((s) => s.done).length;
+  const open = !!App.rOpen[inst.id];
+  const pct = n ? Math.round((d / n) * 100) : 0;
+  const rows = subs.map((s) =>
+    `<div class="row"><span class="chk ${s.done ? 'on' : ''}" data-rsub="${inst.id}|${s.id}"></span>`
+    + `<div class="rtxt ${s.done ? 'done' : ''}"><div class="t">${esc(s.text)}</div></div></div>`).join('');
+  return `<div class="card">`
+    + `<div class="rhead" data-rtoggle="${inst.id}">`
+    + `<span class="t">${inst.done ? '✅ ' : ''}${esc(inst.title)}</span>`
+    + `<span class="sub">${d} av ${n} gjort</span></div>`
+    + (n ? `<div class="progbar"><i style="width:${pct}%"></i></div>` : '')
+    + (open ? `<div class="rbody">${rows}`
+        + `<button class="mini" data-rskip="${inst.id}">Ikke i dag</button>`
+        + `<button class="mini" data-redit="${inst.routineId}">Rediger mal</button></div>` : '')
+    + `</div>`;
+}
+
+function sleepRowHtml(r) {
+  return `<div class="row"><div class="rtxt"><div class="t">${esc(r.title)}</div>`
+    + `<div class="m">${(r.subtasks || []).length} steg</div></div>`
+    + `<button class="mini" data-rwake="${r.id}">Vekk</button>`
+    + `<button class="mini" data-redit="${r.id}">✎</button></div>`;
+}
+
+function tmplRowHtml(r) {
+  const when = r.sleeping ? 'sovende' : ((r.weekdays || []).length ? r.weekdays.map((k) => WD_LABEL[k] || k).join(' ') : 'ingen dager');
+  return `<div class="row"><div class="rtxt"><div class="t">${r.enabled ? '' : '⏸ '}${esc(r.title)}</div>`
+    + `<div class="m">${esc(when)}${r.leadDay ? ' · dagen før' : ''}</div></div>`
+    + `<button class="mini" data-redit="${r.id}">✎</button></div>`;
+}
+
+function renderRoutines() {
+  const today = todayIso();
+  const tomorrow = L.addDaysIso(today, 1);
+  const todayInst = L.routineInstancesForDate(App.state, today);
+  const tomInst = L.routineInstancesForDate(App.state, tomorrow);
+  const sleeping = L.sleepingRoutines(App.state);
+  const all = App.state.settings.routines.slice();
+  return headerBar('🔁 Rutiner')
+    + `<div class="body">`
+    + `<p class="sub">Dine rutiner maser ikke – du henter dem når du vil.</p>`
+    + `<h2>I dag</h2>` + (todayInst.length ? todayInst.map(instCardHtml).join('') : `<p class="sub">Ingen aktive i dag.</p>`)
+    + (tomInst.length ? `<h2>For i morgen 🌙</h2>` + tomInst.map(instCardHtml).join('') : '')
+    + `<h2>Sovende</h2>` + (sleeping.length ? `<div class="card">${sleeping.map(sleepRowHtml).join('')}</div>` : `<p class="sub">Ingen sovende rutiner.</p>`)
+    + `<h2>Alle rutiner</h2>` + (all.length ? `<div class="card">${all.map(tmplRowHtml).join('')}</div>` : `<p class="sub">Ingen ennå.</p>`)
+    + `<button class="btn" data-rnew="1">＋ Ny rutine</button>`
+    + `</div>`;
+}
+
+function openRoutineEditor(id) {
+  if (id) {
+    const r = App.state.settings.routines.find((x) => x.id === id);
+    if (!r) return;
+    App.routineEdit = L.clone(r);
+  } else {
+    App.routineEdit = { id: null, title: '', subtasks: [{ id: 't0', text: '' }], weekdays: [], enabled: true, leadDay: false, sleeping: false };
+  }
+  renderRoutineEditor();
+}
+
+function renderRoutineEditor() {
+  const e = App.routineEdit;
+  const wdChips = WD.map(([k, l]) =>
+    `<span class="chip ${(e.weekdays || []).includes(k) ? 'on' : ''}" data-ewd="${k}">${l}</span>`).join('');
+  const subRows = (e.subtasks || []).map((s, i) =>
+    `<div class="row"><input class="inp" style="margin:0" data-esub="${i}" value="${esc(s.text)}" placeholder="Deloppgave…">`
+    + `<button class="mini" data-eup="${i}">↑</button>`
+    + `<button class="mini" data-edown="${i}">↓</button>`
+    + `<button class="mini" data-edel="${i}">✕</button></div>`).join('');
+  const html = `<div class="overlay" id="ov"><div class="sheet">`
+    + `<input class="inp" id="eTitle" placeholder="Rutinenavn (f.eks. Kveldssjekk)" value="${esc(e.title)}">`
+    + `<div class="lab">Deloppgaver</div>${subRows}`
+    + `<button class="btn ghost" id="eAddSub">＋ Deloppgave</button>`
+    + `<div class="lab">Ukedager</div><div class="wdrow">${wdChips}</div>`
+    + `<div class="lab">Valg</div><div class="chips">`
+    + `<span class="chip ${e.sleeping ? 'on' : ''}" data-etgl="sleeping">💤 Sovende (vekk ved behov)</span>`
+    + `<span class="chip ${e.leadDay ? 'on' : ''}" data-etgl="leadDay">🌙 Vis fra dagen før</span>`
+    + `<span class="chip ${e.enabled ? 'on' : ''}" data-etgl="enabled">På</span></div>`
+    + `<button class="btn" id="eSave">${e.id ? 'Lagre endringer' : 'Lagre rutine'}</button>`
+    + `<button class="btn ghost" id="eCancel">Avbryt</button>`
+    + (e.id ? `<button class="btn ghost" id="eDelete">Slett rutine</button>` : '')
+    + `</div></div>`;
+  const old = document.getElementById('ov'); if (old) old.remove();
+  document.getElementById('app').insertAdjacentHTML('beforeend', html);
+  bindRoutineEditor();
+}
+
+function bindRoutineEditor() {
+  const o = document.getElementById('ov');
+  const e = App.routineEdit;
+  o.querySelector('#eTitle').oninput = (ev) => { e.title = ev.target.value; };
+  o.querySelectorAll('[data-esub]').forEach((el) =>
+    el.oninput = () => { e.subtasks[Number(el.dataset.esub)].text = el.value; });
+  o.querySelectorAll('[data-edel]').forEach((el) =>
+    el.onclick = () => { e.subtasks.splice(Number(el.dataset.edel), 1); renderRoutineEditor(); });
+  o.querySelectorAll('[data-eup]').forEach((el) =>
+    el.onclick = () => { const i = Number(el.dataset.eup); if (i > 0) { const a = e.subtasks; [a[i - 1], a[i]] = [a[i], a[i - 1]]; renderRoutineEditor(); } });
+  o.querySelectorAll('[data-edown]').forEach((el) =>
+    el.onclick = () => { const i = Number(el.dataset.edown); const a = e.subtasks; if (i < a.length - 1) { [a[i + 1], a[i]] = [a[i], a[i + 1]]; renderRoutineEditor(); } });
+  o.querySelector('#eAddSub').onclick = () => { e.subtasks.push({ id: 't' + Date.now().toString(36), text: '' }); renderRoutineEditor(); };
+  o.querySelectorAll('[data-ewd]').forEach((el) => el.onclick = () => {
+    const k = el.dataset.ewd; e.weekdays = e.weekdays || [];
+    e.weekdays = e.weekdays.includes(k) ? e.weekdays.filter((x) => x !== k) : e.weekdays.concat([k]);
+    renderRoutineEditor();
+  });
+  o.querySelectorAll('[data-etgl]').forEach((el) => el.onclick = () => {
+    const k = el.dataset.etgl; e[k] = !e[k]; renderRoutineEditor();
+  });
+  o.querySelector('#eCancel').onclick = () => { App.routineEdit = null; o.remove(); };
+  o.querySelector('#eSave').onclick = saveRoutineEditor;
+  const del = o.querySelector('#eDelete');
+  if (del) del.onclick = () => {
+    const id = e.id; App.routineEdit = null; o.remove();
+    commit(L.deleteRoutine(App.state, { id }, ctx()));
+  };
+}
+
+function saveRoutineEditor() {
+  const e = App.routineEdit;
+  if (!e.title.trim()) { App.routineEdit = null; closeSheet(); return; }
+  const subtasks = (e.subtasks || []).filter((s) => s.text.trim()).map((s) => ({ id: s.id, text: s.text }));
+  const payload = { title: e.title, subtasks, weekdays: e.weekdays || [], enabled: e.enabled, leadDay: e.leadDay, sleeping: e.sleeping };
+  let next;
+  if (e.id) next = L.updateRoutine(App.state, { id: e.id, patch: payload }, ctx());
+  else next = L.addRoutine(App.state, { routine: payload }, ctx());
+  next = syncRoutines(next);
+  App.routineEdit = null;
+  const o = document.getElementById('ov'); if (o) o.remove();
+  commit(next);
+}
+
 function renderSettings() {
   return headerBar('⚙️ Innstillinger')
     + `<div class="body"><p class="sub">Kommer i egen plan (kategorier, kveldssjekk, rutiner, snarvei).</p></div>`;
@@ -268,5 +433,7 @@ function openDefer(id) {
 }
 
 App.state = loadState();
+App.state = syncRoutines(App.state);
+saveStateDebounced(App.state);
 render();
 window.App = App; // for feilsøking i konsollen
