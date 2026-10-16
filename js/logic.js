@@ -434,5 +434,17 @@ export function promoteToToday(state, { id }, ctx) {
   }, ctx);
 }
 
-export function mediumItems(state) { return []; }
-export function mediumBadge(state) { return { count: 0, level: 'calm' }; }
+export function mediumItems(state) {
+  const rank = { nag: 0, nudge: 1, chill: 2 };
+  return activeItems(state)
+    .filter((i) => i.type === 'someday' && !i.done)
+    .sort((a, b) =>
+      rank[a.insistence || 'chill'] - rank[b.insistence || 'chill']
+      || (b.createdAt || '').localeCompare(a.createdAt || ''));
+}
+
+export function mediumBadge(state) {
+  const n = activeItems(state)
+    .filter((i) => i.type === 'someday' && !i.done && i.insistence === 'nag').length;
+  return { count: n, level: n ? 'open' : 'calm' };
+}

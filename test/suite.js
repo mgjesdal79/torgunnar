@@ -462,6 +462,29 @@ export function runTests() {
     const today = itemsForToday(s, '2026-10-16T09:00:00.000Z').map((i) => i.id);
     eq(today, ['m1']);
   });
+  t('mediumItems: someday ikke-done sortert nag→nudge→chill', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'C', type: 'someday' }, { now: '2026-10-16T08:00:00.000Z', id: 'c' });
+    s = addItem(s, { text: 'A', type: 'someday' }, { now: '2026-10-16T08:00:01.000Z', id: 'a' });
+    s = addItem(s, { text: 'B', type: 'someday' }, { now: '2026-10-16T08:00:02.000Z', id: 'b' });
+    s = L.setInsistence(s, { id: 'c', insistence: 'chill' }, { now: 'N' });
+    s = L.setInsistence(s, { id: 'a', insistence: 'nag' }, { now: 'N' });
+    s = L.setInsistence(s, { id: 'b', insistence: 'nudge', cadenceDays: 7 }, { now: '2026-10-16T08:00:00.000Z' });
+    eq(L.mediumItems(s).map((i) => i.id), ['a', 'b', 'c']);
+  });
+  t('mediumItems utelater done', () => {
+    let s = somedayState();
+    s = completeItem(s, { id: 'm1' }, { now: 'N' });
+    eq(L.mediumItems(s).length, 0);
+  });
+  t('mediumBadge teller kun nag', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'A', type: 'someday' }, { now: '2026-10-16T08:00:00.000Z', id: 'a' });
+    s = addItem(s, { text: 'B', type: 'someday' }, { now: '2026-10-16T08:00:00.000Z', id: 'b' });
+    s = L.setInsistence(s, { id: 'a', insistence: 'nag' }, { now: 'N' });
+    s = L.setInsistence(s, { id: 'b', insistence: 'chill' }, { now: 'N' });
+    eq(L.mediumBadge(s), { count: 1, level: 'open' });
+  });
 
   return results;
 }
