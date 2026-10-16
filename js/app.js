@@ -33,33 +33,34 @@ function tileHtml(icon, label, badge, data) {
 
 function renderHome() {
   const now = nowIso();
-  const cats = App.state.settings.categories.slice().sort((a, b) => a.order - b.order);
-  const catTiles = cats.map((c) =>
-    tileHtml(c.icon, c.label, L.categoryBadge(App.state, c.id, now), `data-cat="${esc(c.id)}"`)).join('');
   const inboxN = L.inboxItems(App.state, now).length;
   const todayN = L.itemsForToday(App.state, now).length;
+  const taskN = L.taskItems(App.state, now).length;
   const mediumN = L.mediumBadge(App.state);
   const konaN = L.konaBadge(App.state);
-  const special = tileHtml('💛', 'På et tidspunkt', mediumN, 'data-view="medium"')
-    + tileHtml('💬', 'Fra kona', konaN, 'data-view="kona"')
-    + tileHtml('📥', 'Innboks', { count: inboxN, level: inboxN ? 'hot' : 'calm' }, 'data-view="inbox"')
+  const tiles = tileHtml('📥', 'Innboks', { count: inboxN, level: inboxN ? 'hot' : 'calm' }, 'data-view="inbox"')
     + tileHtml('📌', 'I dag', { count: todayN, level: todayN ? 'open' : 'calm' }, 'data-view="today"')
+    + tileHtml('✅', 'Gjøremål', { count: taskN, level: taskN ? 'open' : 'calm' }, 'data-view="tasks"')
+    + tileHtml('💛', 'Langsiktig', mediumN, 'data-view="medium"')
+    + tileHtml('📝', 'Notater', null, 'data-view="notes"')
+    + tileHtml('💬', 'Ingrid', konaN, 'data-view="kona"')
     + tileHtml('🔁', 'Rutiner', null, 'data-view="routines"')
     + tileHtml('⚙️', 'Innstillinger', null, 'data-view="settings"');
   return `<div class="banner"><div class="b">🦸‍♂️ Tor Gunnar</div>`
     + `<div class="status">${esc(statusLine())}</div></div>`
     + `<div class="body">`
     + `<div class="capbar" data-cap="1"><span class="p">＋</span> Fang en tanke…</div>`
-    + `<div class="grid">${catTiles}${special}</div></div>`;
+    + `<div class="grid">${tiles}</div></div>`;
 }
 
 function render() {
   const root = document.getElementById('app');
   const v = App.view;
-  if (v === 'category') root.innerHTML = renderCategory();
-  else if (v === 'inbox') root.innerHTML = renderInbox();
+  if (v === 'inbox') root.innerHTML = renderInbox();
   else if (v === 'today') root.innerHTML = renderToday();
+  else if (v === 'tasks') root.innerHTML = renderTasks();
   else if (v === 'medium') root.innerHTML = renderMedium();
+  else if (v === 'notes') root.innerHTML = renderNotes();
   else if (v === 'kona') root.innerHTML = renderKona();
   else if (v === 'routines') root.innerHTML = renderRoutines();
   else if (v === 'settings') root.innerHTML = renderSettings();
@@ -68,8 +69,6 @@ function render() {
 }
 
 function bind(root) {
-  root.querySelectorAll('[data-cat]').forEach((el) =>
-    el.onclick = () => { App.view = 'category'; App.catId = el.dataset.cat; render(); });
   root.querySelectorAll('[data-view]').forEach((el) =>
     el.onclick = () => {
       App.view = el.dataset.view;
@@ -77,7 +76,7 @@ function bind(root) {
       render();
     });
   const cap = root.querySelector('[data-cap]');
-  if (cap) cap.onclick = () => openSheet(null, cap.dataset.captype || null);
+  if (cap) cap.onclick = () => openSheet(cap.dataset.captype || 'task');
   root.querySelectorAll('[data-home]').forEach((el) =>
     el.onclick = () => { App.view = 'home'; App.catId = null; render(); });
   root.querySelectorAll('[data-done]').forEach((el) =>
@@ -107,6 +106,15 @@ function bind(root) {
     el.onclick = () => commit(L.snoozeNudge(App.state, { id: el.dataset.msnooze }, ctx())));
   root.querySelectorAll('[data-kdismiss]').forEach((el) =>
     el.onclick = () => commit(L.deleteItem(App.state, { id: el.dataset.kdismiss }, ctx())));
+  root.querySelectorAll('[data-settime]').forEach((el) =>
+    el.onclick = () => openTimePicker(el.dataset.settime));
+  root.querySelectorAll('[data-ios]').forEach((el) =>
+    el.onclick = () => pushToIos(el.dataset.ios));
+  const ssSave = root.querySelector('#setShortcutSave');
+  if (ssSave) ssSave.onclick = () => {
+    const v = root.querySelector('#setShortcut').value;
+    commit(L.setShortcutName(App.state, { name: v }, ctx()));
+  };
   const konaAdd = root.querySelector('#konaAdd');
   if (konaAdd) {
     const inp = root.querySelector('#konaText');
@@ -120,22 +128,22 @@ function bind(root) {
   }
 }
 
-const TYPES = [
+const CAPTURE_TYPES = [
+  { id: 'task', label: '✅ Gjøremål' },
+  { id: 'someday', label: '💛 Langsiktig' },
   { id: 'note', label: '📝 Notat' },
-  { id: 'task', label: '✅ Oppgave' },
-  { id: 'reminder', label: '⏰ Påminnelse' },
-  { id: 'someday', label: '💛 På et tidspunkt' },
 ];
 
-function openSheet(prefillCat, prefillType) {
-  App.sheet = { editId: null, text: '', type: prefillType || null, category: prefillCat || null,
+function openSheet(prefillType) {
+  App.sheet = { editId: null, text: '', type: prefillType || 'task',
                 insistence: 'chill', cadenceDays: 7 };
   renderSheet();
 }
 function openEdit(id) {
   const it = App.state.items.find((i) => i.id === id);
   if (!it) return;
-  App.sheet = { editId: id, text: it.text || '', type: it.type || null, category: it.category || null,
+  const type = ['task', 'someday', 'note'].includes(it.type) ? it.type : 'task';
+  App.sheet = { editId: id, text: it.text || '', type,
                 insistence: it.insistence || 'chill', cadenceDays: it.cadenceDays || 7 };
   renderSheet();
 }
@@ -143,11 +151,8 @@ function closeSheet() { App.sheet = null; const o = document.getElementById('ov'
 
 function renderSheet() {
   const s = App.sheet;
-  const cats = App.state.settings.categories.slice().sort((a, b) => a.order - b.order);
-  const typeChips = TYPES.map((tp) =>
+  const typeChips = CAPTURE_TYPES.map((tp) =>
     `<span class="chip ${s.type === tp.id ? 'on' : ''}" data-type="${tp.id}">${tp.label}</span>`).join('');
-  const catChips = cats.map((c) =>
-    `<span class="chip ${s.category === c.id ? 'on' : ''}" data-catchip="${esc(c.id)}">${c.icon} ${esc(c.label)}</span>`).join('');
   const INSIST_CHIPS = [['chill', '😴 Chill'], ['nudge', '👋 Dult'], ['nag', '📣 Masete']];
   const insistRow = s.type === 'someday'
     ? `<div class="lab">Hvor mye skal den mase?</div><div class="chips">`
@@ -161,17 +166,10 @@ function renderSheet() {
             + `</div>`
           : '')
     : '';
-  const remindRow = s.type === 'reminder'
-    ? `<div class="lab">Minn meg om…</div><div class="chips">`
-      + App.state.settings.remindPresets.map((m) =>
-          `<span class="chip" data-remind="${m}">+${m >= 60 ? (m / 60) + 't' : m + 'm'}</span>`).join('')
-      + `</div>` : '';
   const html = `<div class="overlay" id="ov"><div class="sheet">`
-    + `<input class="inp" id="capText" placeholder="Hva skal du ikke glemme?" value="${esc(s.text)}">`
-    + `<div class="lab">Hva er dette? (valgfritt)</div><div class="chips">${typeChips}</div>`
+    + `<textarea class="inp" id="capText" rows="2" placeholder="Hva skal du ikke glemme?">${esc(s.text)}</textarea>`
+    + `<div class="lab">Hva er dette?</div><div class="chips">${typeChips}</div>`
     + insistRow
-    + remindRow
-    + `<div class="lab">Kategori (valgfritt)</div><div class="chips">${catChips}</div>`
     + `<button class="btn" id="capSave">${s.editId ? 'Lagre endringer' : 'Lagre'}</button>`
     + `<button class="btn ghost" id="capCancel">Avbryt</button>`
     + (s.editId ? `<button class="btn ghost" id="capDelete">Slett</button>` : '')
@@ -186,17 +184,11 @@ function bindSheet() {
   const text = o.querySelector('#capText');
   text.oninput = () => { App.sheet.text = text.value; };
   o.querySelectorAll('[data-type]').forEach((el) => el.onclick = () => {
-    App.sheet.type = App.sheet.type === el.dataset.type ? null : el.dataset.type; renderSheet(); });
-  o.querySelectorAll('[data-catchip]').forEach((el) => el.onclick = () => {
-    App.sheet.category = App.sheet.category === el.dataset.catchip ? null : el.dataset.catchip; renderSheet(); });
+    App.sheet.type = el.dataset.type; renderSheet(); });
   o.querySelectorAll('[data-insist]').forEach((el) => el.onclick = () => {
     App.sheet.insistence = el.dataset.insist; renderSheet(); });
   o.querySelectorAll('[data-cad]').forEach((el) => el.onclick = () => {
     App.sheet.cadenceDays = Number(el.dataset.cad); renderSheet(); });
-  o.querySelectorAll('[data-remind]').forEach((el) => el.onclick = () => {
-    App.sheet._remindMin = Number(el.dataset.remind);
-    o.querySelectorAll('[data-remind]').forEach((x) => x.classList.remove('on'));
-    el.classList.add('on'); });
   o.querySelector('#capCancel').onclick = closeSheet;
   o.querySelector('#capSave').onclick = saveSheet;
   const del = o.querySelector('#capDelete');
@@ -218,17 +210,12 @@ function saveSheet() {
   if (s.editId) {
     next = L.setItemText(App.state, { id, text: s.text }, c);
     next = L.classifyItem(next, { id, type: s.type }, { now: c.now, id: newId() });
-    next = L.setItemCategory(next, { id, category: s.category }, { now: c.now, id: newId() });
   } else {
-    next = L.addItem(App.state, { text: s.text, type: s.type, category: s.category }, c);
+    next = L.addItem(App.state, { text: s.text, type: s.type }, c);
   }
   if (s.type === 'someday') {
     next = L.setInsistence(next, { id, insistence: s.insistence, cadenceDays: s.cadenceDays },
                            { now: c.now, id: newId() });
-  }
-  if (s.type === 'reminder' && s._remindMin) {
-    next = L.setReminder(next, { id, remindAt: L.addMinutesIso(c.now, s._remindMin) },
-                         { now: c.now, id: newId() });
   }
   App.state = next; saveStateDebounced(App.state);
   closeSheet(); render();
@@ -239,6 +226,10 @@ function fmtTime(iso) {
 }
 function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('no-NO', { day: '2-digit', month: '2-digit' });
+}
+function fmtDateTime(iso) {
+  return new Date(iso).toLocaleString('no-NO',
+    { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
 function itemRowHtml(it) {
@@ -251,7 +242,7 @@ function itemRowHtml(it) {
   if (it.due) meta.push('🗓 ' + it.due);
   if (it.remindAt) meta.push('⏰ ' + fmtTime(it.remindAt));
   if (it.deferred && it.resurfaceAt && !L.isResurfaced(it, now)) meta.push('💤 tilbake ' + fmtDate(it.resurfaceAt));
-  const typeLabel = { note: 'Notat', task: 'Oppgave', reminder: 'Påminnelse', someday: 'På et tidspunkt' }[it.type] || 'Uklassifisert';
+  const typeLabel = { note: 'Notat', task: 'Gjøremål', reminder: 'Påminnelse', someday: 'Langsiktig' }[it.type] || 'Uklassifisert';
   return `<div class="row">${chk}`
     + `<div class="rtxt ${it.done ? 'done' : ''}" data-edit="${it.id}"><div class="t">${esc(it.text)}</div>`
     + (meta.length ? `<div class="m">${esc(meta.join(' · '))}</div>` : '')
@@ -270,20 +261,53 @@ function headerBar(title) {
     + `<div class="b">${esc(title)}</div></div>`;
 }
 
-function renderCategory() {
+function taskRowHtml(it) {
   const now = nowIso();
-  const cat = App.state.settings.categories.find((c) => c.id === App.catId);
-  const items = L.categoryItems(App.state, App.catId);
-  const open = items.filter((i) => L.isPending(i, now));
-  const notes = items.filter((i) => i.type === 'note');
-  const rest = items.filter((i) => !open.includes(i) && !notes.includes(i));
-  return headerBar((cat ? cat.icon + ' ' + cat.label : 'Kategori'))
+  const chk = `<span class="chk ${it.done ? 'on' : ''}" data-done="${it.id}"></span>`;
+  const meta = [];
+  if (it.remindAt) meta.push('⏰ ' + fmtDateTime(it.remindAt));
+  else if (it.due) meta.push('🗓 ' + it.due);
+  if (it.deferred && it.resurfaceAt && !L.isResurfaced(it, now)) meta.push('💤 tilbake ' + fmtDate(it.resurfaceAt));
+  const timeBtn = `<button class="mini" data-settime="${it.id}">⏰ ${it.remindAt ? 'Endre tid' : 'Sett tid'}</button>`;
+  const iosBtn = it.remindAt
+    ? (it.iosPushedAt
+        ? `<button class="mini" data-ios="${it.id}">✓ i Påminnelser · send på nytt</button>`
+        : `<button class="mini" data-ios="${it.id}">⏰ Legg i Påminnelser</button>`)
+    : '';
+  return `<div class="card"><div class="row">${chk}`
+    + `<div class="rtxt ${it.done ? 'done' : ''}" data-edit="${it.id}"><div class="t">${esc(it.text)}</div>`
+    + (meta.length ? `<div class="m">${esc(meta.join(' · '))}</div>` : '')
+    + `</div></div>`
+    + `<div class="taskacts">${timeBtn}${iosBtn}`
+    + `<button class="mini" data-defer="${it.id}">Ikke nå</button></div></div>`;
+}
+
+function renderTasks() {
+  const items = L.taskItems(App.state, nowIso());
+  const body = items.length
+    ? items.map(taskRowHtml).join('')
+    : `<p class="sub">Ingen gjøremål nå 🌱</p>`;
+  return headerBar('✅ Gjøremål')
     + `<div class="body">`
-    + `<div class="capbar" data-cap="1"><span class="p">＋</span> Fang noe i ${esc(cat ? cat.label : '')}…</div>`
-    + `<h2>Å gjøre</h2>${listCard(open)}`
-    + (notes.length ? `<h2>Notater</h2>${listCard(notes)}` : '')
-    + (rest.length ? `<h2>Annet</h2>${listCard(rest)}` : '')
-    + `</div>`;
+    + `<div class="capbar" data-cap="1" data-captype="task"><span class="p">＋</span> Nytt gjøremål…</div>`
+    + body + `</div>`;
+}
+
+function noteRowHtml(it) {
+  return `<div class="row">`
+    + `<div class="rtxt" data-edit="${it.id}"><div class="t">${esc(it.text)}</div></div>`
+    + `<button class="mini" data-edit="${it.id}">Rediger</button></div>`;
+}
+
+function renderNotes() {
+  const items = L.noteItems(App.state);
+  const body = items.length
+    ? `<div class="card">${items.map(noteRowHtml).join('')}</div>`
+    : `<p class="sub">Ingen notater 🌱</p>`;
+  return headerBar('📝 Notater')
+    + `<div class="body">`
+    + `<div class="capbar" data-cap="1" data-captype="note"><span class="p">＋</span> Nytt notat…</div>`
+    + body + `</div>`;
 }
 
 function nudgeRowHtml(it) {
@@ -342,8 +366,8 @@ function renderMedium() {
     const g = items.filter((i) => (i.insistence || 'chill') === key);
     if (g.length) body += `<h2>${label}</h2><div class="card">${g.map(mediumRowHtml).join('')}</div>`;
   });
-  if (!body) body = `<p class="sub">Ingenting her ennå. Fang noe som «💛 På et tidspunkt».</p>`;
-  return headerBar('💛 På et tidspunkt')
+  if (!body) body = `<p class="sub">Ingenting her ennå. Fang noe som «💛 Langsiktig».</p>`;
+  return headerBar('💛 Langsiktig')
     + `<div class="body">`
     + `<div class="capbar" data-cap="1" data-captype="someday"><span class="p">＋</span> Fang noe til senere…</div>`
     + body + `</div>`;
@@ -360,10 +384,10 @@ function renderKona() {
   const items = L.konaItems(App.state);
   const list = items.length
     ? `<div class="card">${items.map(konaRowHtml).join('')}</div>`
-    : `<p class="sub">Ingen lapper fra kona akkurat nå 🌱</p>`;
-  return headerBar('💬 Fra kona')
+    : `<p class="sub">Ingen lapper fra Ingrid akkurat nå 🌱</p>`;
+  return headerBar('💬 Ingrid')
     + `<div class="body">`
-    + `<p class="sub">Legg igjen en beskjed til Tor Gunnar. Han triagerer dem selv.</p>`
+    + `<p class="sub">Ingrid legger igjen en beskjed til Tor Gunnar. Han triagerer dem selv.</p>`
     + `<div class="konacap"><input class="inp" id="konaText" placeholder="Skriv en lapp…">`
     + `<button class="btn" id="konaAdd">Legg til</button></div>`
     + list + `</div>`;
@@ -507,8 +531,17 @@ function saveRoutineEditor() {
 }
 
 function renderSettings() {
+  const name = App.state.settings.shortcutName || 'TorGunnar';
   return headerBar('⚙️ Innstillinger')
-    + `<div class="body"><p class="sub">Kommer i egen plan (kategorier, kveldssjekk, rutiner, snarvei).</p></div>`;
+    + `<div class="body">`
+    + `<h2>Apple Påminnelser</h2>`
+    + `<p class="sub">Navnet på iOS-snarveien som legger gjøremål i Påminnelser.</p>`
+    + `<input class="inp" id="setShortcut" value="${esc(name)}">`
+    + `<button class="btn" id="setShortcutSave">Lagre navn</button>`
+    + `<p class="sub">Engangsoppsett på iPhone:</p>`
+    + `<p class="sub">1) Lag en snarvei med akkurat dette navnet. Steg i snarveien: «Hent ordbok fra inndata» → «Hent ordbokverdi» for <b>title</b> og <b>due</b> → «Dato» på due → «Opprett påminnelse» (tittel = title, forfall = datoen).</p>`
+    + `<p class="sub">2) Slå på <b>Innstillinger → Varsler → Påminnelser → Tidssensitive varsler</b> så de bryter gjennom Fokus.</p>`
+    + `</div>`;
 }
 
 function doComplete(id, el) {
@@ -547,6 +580,45 @@ function openDefer(id) {
     o.remove();
     commit(L.deferItem(App.state, { id, resurfaceAt: deferTarget(p) }, ctx()));
   });
+}
+
+function openTimePicker(id) {
+  const chips = DEFER_PRESETS.map((p, i) => `<span class="chip" data-tp="${i}">${p.label}</span>`).join('');
+  const html = `<div class="overlay" id="ov"><div class="sheet">`
+    + `<div class="lab">Sett tid for gjøremålet</div><div class="chips">${chips}</div>`
+    + `<div class="lab">Eller velg nøyaktig</div>`
+    + `<input class="inp" type="datetime-local" id="timeExact">`
+    + `<button class="btn" id="timeSet">Sett tid</button>`
+    + `<button class="btn ghost" id="timeCancel">Avbryt</button></div></div>`;
+  document.getElementById('app').insertAdjacentHTML('beforeend', html);
+  const o = document.getElementById('ov');
+  o.querySelector('#timeCancel').onclick = () => o.remove();
+  o.querySelectorAll('[data-tp]').forEach((el) => el.onclick = () => {
+    const p = DEFER_PRESETS[Number(el.dataset.tp)];
+    o.remove();
+    commit(L.scheduleTask(App.state, { id, at: deferTarget(p) }, ctx()));
+  });
+  o.querySelector('#timeSet').onclick = () => {
+    const v = o.querySelector('#timeExact').value;
+    o.remove();
+    if (!v) return;
+    commit(L.scheduleTask(App.state, { id, at: new Date(v).toISOString() }, ctx()));
+  };
+}
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+function localDue(iso) {
+  const d = new Date(iso);
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate())
+    + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+}
+function pushToIos(id) {
+  const it = App.state.items.find((i) => i.id === id);
+  if (!it || !it.remindAt) return;
+  const url = L.buildShortcutUrl(App.state.settings.shortcutName,
+    { title: it.text, due: localDue(it.remindAt) });
+  window.location.href = url;
+  commit(L.markPushedToIos(App.state, { id }, ctx()));
 }
 
 App.state = loadState();

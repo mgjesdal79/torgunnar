@@ -1,5 +1,5 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge } from '../js/logic.js';
-const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge };
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, noteItems, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge } from '../js/logic.js';
+const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge, taskItems, noteItems, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName };
 
 export function runTests() {
   const results = [];
@@ -15,13 +15,14 @@ export function runTests() {
 
   t('harness virker', () => { eq(1 + 1, 2); ok(true); });
 
-  t('defaultState har tomme lister og kategorier', () => {
+  t('defaultState har tomme lister og ingen kategorier', () => {
     const s = defaultState();
     eq(s.items, []);
     eq(s.log, []);
     eq(s.checkRuns, {});
-    ok(Array.isArray(s.settings.categories));
+    eq(s.settings.categories, []);
     eq(s.settings.remindPresets, [60, 180]);
+    eq(s.settings.shortcutName, 'TorGunnar');
   });
   t('clone er dyp', () => {
     const s = defaultState(); const c = clone(s);
@@ -188,9 +189,10 @@ export function runTests() {
 
   t('addCategory legger til med stigende order', () => {
     let s = defaultState();
+    s = addCategory(s, { label: 'Jobb', icon: '💼' }, { now: '2026-10-13T08:00:00Z', id: 'jobb' });
     s = addCategory(s, { label: 'Trening', icon: '🏃' }, { now: '2026-10-13T08:00:00Z', id: 'trening' });
     const c = s.settings.categories.find((x) => x.id === 'trening');
-    ok(c); eq(c.label, 'Trening'); eq(c.order, 3);
+    ok(c); eq(c.label, 'Trening'); eq(c.order, 1);
   });
   t('deleteCategory foreldreløser items til Innboks (category=null)', () => {
     const now = '2026-10-13T08:00:00Z';
@@ -543,6 +545,83 @@ export function runTests() {
     s = classifyItem(s, { id: 'k1', type: 'someday' }, { now: 'N' });
     eq(L.konaItems(s).length, 0);
     eq(L.mediumItems(s).map((i) => i.id), ['k1']);
+  });
+
+  // === Gjøremål / tid / Påminnelser (build 7) ===
+  t('taskItems: åpne gjøremål, timede først (tid stigende) så nyeste', () => {
+    const now = '2026-10-16T08:00:00.000Z';
+    let s = defaultState();
+    s = addItem(s, { text: 'u-eldst', type: 'task' }, { now: '2026-10-16T07:00:00.000Z', id: 'a' });
+    s = addItem(s, { text: 'u-nyest', type: 'task' }, { now: '2026-10-16T07:30:00.000Z', id: 'b' });
+    s = addItem(s, { text: 'timed-sen', type: 'task' }, { now, id: 'c' });
+    s = L.scheduleTask(s, { id: 'c', at: '2026-10-16T20:00:00.000Z' }, { now });
+    s = addItem(s, { text: 'timed-tidlig', type: 'task' }, { now, id: 'd' });
+    s = L.scheduleTask(s, { id: 'd', at: '2026-10-16T09:00:00.000Z' }, { now });
+    eq(L.taskItems(s, now).map((i) => i.id), ['d', 'c', 'b', 'a']);
+  });
+  t('taskItems utelater done, note, someday og gjemte', () => {
+    const now = '2026-10-16T10:00:00.000Z';
+    let s = defaultState();
+    s = addItem(s, { text: 'done', type: 'task' }, { now, id: 'a' });
+    s = completeItem(s, { id: 'a' }, { now });
+    s = addItem(s, { text: 'note', type: 'note' }, { now, id: 'b' });
+    s = addItem(s, { text: 'someday', type: 'someday' }, { now, id: 'c' });
+    s = addItem(s, { text: 'gjemt', type: 'task' }, { now, id: 'd' });
+    s = deferItem(s, { id: 'd', resurfaceAt: '2026-10-20T00:00:00.000Z' }, { now });
+    s = addItem(s, { text: 'åpen', type: 'task' }, { now, id: 'e' });
+    eq(L.taskItems(s, now).map((i) => i.id), ['e']);
+  });
+  t('noteItems: kun notater, nyeste først', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'n1', type: 'note' }, { now: '2026-10-16T08:00:00.000Z', id: 'a' });
+    s = addItem(s, { text: 'n2', type: 'note' }, { now: '2026-10-16T09:00:00.000Z', id: 'b' });
+    s = addItem(s, { text: 'task', type: 'task' }, { now: '2026-10-16T10:00:00.000Z', id: 'c' });
+    eq(L.noteItems(s).map((i) => i.id), ['b', 'a']);
+  });
+  t('scheduleTask setter remindAt + due (dato), type task, nullstiller ios', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'x' }, { now: '2026-10-16T08:00:00.000Z', id: 'a' }); // type null
+    s.items[0].iosPushedAt = 'gammel';
+    s = L.scheduleTask(s, { id: 'a', at: '2026-10-17T18:30:00.000Z' }, { now: '2026-10-16T08:00:00.000Z' });
+    const it = s.items[0];
+    eq(it.remindAt, '2026-10-17T18:30:00.000Z');
+    eq(it.due, '2026-10-17');
+    eq(it.type, 'task');
+    eq(it.iosPushedAt, null);
+  });
+  t('scheduleTask beholder eksisterende type', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'x', type: 'someday' }, { now: 'N', id: 'a' });
+    s = L.scheduleTask(s, { id: 'a', at: '2026-10-17T18:30:00.000Z' }, { now: 'N2' });
+    eq(s.items[0].type, 'someday');
+  });
+  t('scheduleTask → vises i I dag på dagens dato selv før klokkeslett', () => {
+    const now = '2026-10-16T08:00:00.000Z';
+    let s = defaultState();
+    s = addItem(s, { text: 'x', type: 'task' }, { now, id: 'a' });
+    s = L.scheduleTask(s, { id: 'a', at: '2026-10-16T20:00:00.000Z' }, { now });
+    eq(itemsForToday(s, now).map((i) => i.id), ['a']);
+  });
+  t('markPushedToIos setter iosPushedAt', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'x', type: 'task' }, { now: 'N', id: 'a' });
+    s = L.markPushedToIos(s, { id: 'a' }, { now: '2026-10-16T08:00:00.000Z' });
+    eq(s.items[0].iosPushedAt, '2026-10-16T08:00:00.000Z');
+  });
+  t('buildShortcutUrl: input=text + egen text-param, url-enkodet JSON', () => {
+    const url = L.buildShortcutUrl('Tor Gunnar', { title: 'Ring mor', due: '2026-10-17 18:30' });
+    eq(url.indexOf('shortcuts://run-shortcut?name=Tor%20Gunnar'), 0);
+    ok(url.indexOf('&input=text&text=') > -1, 'mangler input=text&text=: ' + url);
+    const payload = JSON.parse(decodeURIComponent(url.split('&text=')[1]));
+    eq(payload, { title: 'Ring mor', due: '2026-10-17 18:30' });
+  });
+  t('setShortcutName trimmer og faller tilbake til TorGunnar', () => {
+    let s = defaultState();
+    s = L.setShortcutName(s, { name: '  MinSnarvei ' }, { now: 'N' });
+    eq(s.settings.shortcutName, 'MinSnarvei');
+    eq(s.settings.updatedAt, 'N');
+    s = L.setShortcutName(s, { name: '' }, { now: 'N2' });
+    eq(s.settings.shortcutName, 'TorGunnar');
   });
 
   return results;

@@ -5,14 +5,10 @@ export function clone(s) { return JSON.parse(JSON.stringify(s)); }
 export function defaultState() {
   return {
     settings: {
-      categories: [
-        { id: 'jobb', label: 'Jobb', icon: '💼', order: 0 },
-        { id: 'hjem', label: 'Hjem', icon: '🏠', order: 1 },
-        { id: 'handle', label: 'Handle', icon: '🛒', order: 2 },
-      ],
+      categories: [],
       nightly: [],
       routines: [],
-      shortcutName: 'PandaReminder',
+      shortcutName: 'TorGunnar',
       remindPresets: [60, 180],
       somedayNudgeDays: 7,
       updatedAt: null,
@@ -90,6 +86,28 @@ export function setReminder(state, { id, remindAt }, ctx) {
     it.remindAt = remindAt;
     if (!it.type || it.type === 'note') it.type = 'reminder';
   }, ctx);
+}
+
+// Setter tidspunkt på et gjøremål: remindAt (fyrer i «I dag» på tid) + due (vises
+// hele dagen) + gjør det til et gjøremål hvis det var utypet. Nullstiller ios-push.
+export function scheduleTask(state, { id, at }, ctx) {
+  return patchItem(state, id, (it) => {
+    it.remindAt = at;
+    it.due = (at || '').slice(0, 10);
+    it.iosPushedAt = null;
+    if (!it.type) it.type = 'task';
+  }, ctx);
+}
+
+export function markPushedToIos(state, { id }, ctx) {
+  return patchItem(state, id, (it) => { it.iosPushedAt = ctx.now; }, ctx);
+}
+
+// Ren URL-bygger for iOS-snarveien. Apples skjema: input=text + egen text-param.
+export function buildShortcutUrl(shortcutName, { title, due }) {
+  const payload = JSON.stringify({ title: title || '', due: due || '' });
+  return 'shortcuts://run-shortcut?name=' + encodeURIComponent(shortcutName || '')
+    + '&input=text&text=' + encodeURIComponent(payload);
 }
 
 export function completeItem(state, { id }, ctx) {
@@ -180,7 +198,32 @@ export function somedayItems(state) {
   return activeItems(state).filter((i) => i.type === 'someday');
 }
 
+// Åpne gjøremål. Timede (remindAt) først, stigende på tid; resten nyeste først.
+export function taskItems(state, now) {
+  return activeItems(state)
+    .filter((i) => i.type === 'task' && !i.done && isResurfaced(i, now))
+    .sort((a, b) => {
+      if (a.remindAt && b.remindAt) return a.remindAt.localeCompare(b.remindAt);
+      if (a.remindAt) return -1;
+      if (b.remindAt) return 1;
+      return (b.createdAt || '').localeCompare(a.createdAt || '');
+    });
+}
+
+export function noteItems(state) {
+  return activeItems(state)
+    .filter((i) => i.type === 'note')
+    .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+}
+
 function bumpSettings(out, ctx) { out.settings.updatedAt = ctx.now; }
+
+export function setShortcutName(state, { name }, ctx) {
+  const out = clone(state);
+  out.settings.shortcutName = String(name || '').trim() || 'TorGunnar';
+  bumpSettings(out, ctx);
+  return out;
+}
 
 export function addCategory(state, { label, icon }, ctx) {
   const out = clone(state);
