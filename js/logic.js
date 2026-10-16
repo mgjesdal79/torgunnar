@@ -49,6 +49,7 @@ export function addItem(state, { text, type = null, category = null }, ctx) {
     due: null, remindAt: null,
     resurfaceAt: null, deferred: false, iosPushedAt: null,
     source: null, routineId: null, routineDate: null, subtasks: null,
+    insistence: null, cadenceDays: null,
     createdAt: ctx.now, updatedAt: ctx.now, removed: false,
   };
   out.items.push(item);
@@ -136,7 +137,8 @@ export function isPending(item, now) {
 function dayOf(iso) { return (iso || '').slice(0, 10); }
 
 export function inboxItems(state, now) {
-  return activeItems(state).filter((i) => i.type == null && isResurfaced(i, now));
+  return activeItems(state).filter((i) =>
+    (i.type == null && isResurfaced(i, now)) || nudgeDue(i, now));
 }
 
 export function itemsForToday(state, now) {
@@ -392,4 +394,57 @@ export function skipRoutineInstance(state, { instanceId }, ctx) {
   if (!inst) return state;
   inst.skipped = true; inst.updatedAt = ctx.now;
   return out;
+}
+
+// ---- Mellomlang liste: «På et tidspunkt» (someday med insistence) ----
+export function setInsistence(state, { id, insistence, cadenceDays }, ctx) {
+  return patchItem(state, id, (it) => {
+    it.insistence = insistence;
+    if (insistence === 'nudge') {
+      it.cadenceDays = cadenceDays || 7;
+      it.resurfaceAt = addMinutesIso(ctx.now, it.cadenceDays * 1440);
+    } else {
+      it.cadenceDays = null;
+      it.resurfaceAt = null;
+    }
+  }, ctx);
+}
+
+export function nudgeDue(item, now) {
+  return !!item && !item.removed && !item.done
+    && item.type === 'someday' && item.insistence === 'nudge'
+    && !!item.resurfaceAt && item.resurfaceAt <= now;
+}
+
+export function snoozeNudge(state, { id }, ctx) {
+  return patchItem(state, id, (it) => {
+    const days = it.cadenceDays || 7;
+    it.resurfaceAt = addMinutesIso(ctx.now, days * 1440);
+  }, ctx);
+}
+
+export function promoteToToday(state, { id }, ctx) {
+  return patchItem(state, id, (it) => {
+    it.type = 'task';
+    it.due = (ctx.now || '').slice(0, 10);
+    it.insistence = null;
+    it.cadenceDays = null;
+    it.resurfaceAt = null;
+    it.deferred = false;
+  }, ctx);
+}
+
+export function mediumItems(state) {
+  const rank = { nag: 0, nudge: 1, chill: 2 };
+  return activeItems(state)
+    .filter((i) => i.type === 'someday' && !i.done)
+    .sort((a, b) =>
+      rank[a.insistence || 'chill'] - rank[b.insistence || 'chill']
+      || (b.createdAt || '').localeCompare(a.createdAt || ''));
+}
+
+export function mediumBadge(state) {
+  const n = activeItems(state)
+    .filter((i) => i.type === 'someday' && !i.done && i.insistence === 'nag').length;
+  return { count: n, level: n ? 'open' : 'calm' };
 }

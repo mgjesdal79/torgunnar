@@ -38,7 +38,9 @@ function renderHome() {
     tileHtml(c.icon, c.label, L.categoryBadge(App.state, c.id, now), `data-cat="${esc(c.id)}"`)).join('');
   const inboxN = L.inboxItems(App.state, now).length;
   const todayN = L.itemsForToday(App.state, now).length;
-  const special = tileHtml('📥', 'Innboks', { count: inboxN, level: inboxN ? 'hot' : 'calm' }, 'data-view="inbox"')
+  const mediumN = L.mediumBadge(App.state);
+  const special = tileHtml('💛', 'På et tidspunkt', mediumN, 'data-view="medium"')
+    + tileHtml('📥', 'Innboks', { count: inboxN, level: inboxN ? 'hot' : 'calm' }, 'data-view="inbox"')
     + tileHtml('📌', 'I dag', { count: todayN, level: todayN ? 'open' : 'calm' }, 'data-view="today"')
     + tileHtml('🔁', 'Rutiner', null, 'data-view="routines"')
     + tileHtml('⚙️', 'Innstillinger', null, 'data-view="settings"');
@@ -55,6 +57,7 @@ function render() {
   if (v === 'category') root.innerHTML = renderCategory();
   else if (v === 'inbox') root.innerHTML = renderInbox();
   else if (v === 'today') root.innerHTML = renderToday();
+  else if (v === 'medium') root.innerHTML = renderMedium();
   else if (v === 'routines') root.innerHTML = renderRoutines();
   else if (v === 'settings') root.innerHTML = renderSettings();
   else root.innerHTML = renderHome();
@@ -71,7 +74,7 @@ function bind(root) {
       render();
     });
   const cap = root.querySelector('[data-cap]');
-  if (cap) cap.onclick = () => openSheet(null);
+  if (cap) cap.onclick = () => openSheet(null, cap.dataset.captype || null);
   root.querySelectorAll('[data-home]').forEach((el) =>
     el.onclick = () => { App.view = 'home'; App.catId = null; render(); });
   root.querySelectorAll('[data-done]').forEach((el) =>
@@ -95,6 +98,10 @@ function bind(root) {
     el.onclick = () => openRoutineEditor(null));
   root.querySelectorAll('[data-redit]').forEach((el) =>
     el.onclick = () => openRoutineEditor(el.dataset.redit));
+  root.querySelectorAll('[data-promote]').forEach((el) =>
+    el.onclick = () => commit(L.promoteToToday(App.state, { id: el.dataset.promote }, ctx())));
+  root.querySelectorAll('[data-msnooze]').forEach((el) =>
+    el.onclick = () => commit(L.snoozeNudge(App.state, { id: el.dataset.msnooze }, ctx())));
 }
 
 const TYPES = [
@@ -104,14 +111,16 @@ const TYPES = [
   { id: 'someday', label: '💛 På et tidspunkt' },
 ];
 
-function openSheet(prefillCat) {
-  App.sheet = { editId: null, text: '', type: null, category: prefillCat || null };
+function openSheet(prefillCat, prefillType) {
+  App.sheet = { editId: null, text: '', type: prefillType || null, category: prefillCat || null,
+                insistence: 'chill', cadenceDays: 7 };
   renderSheet();
 }
 function openEdit(id) {
   const it = App.state.items.find((i) => i.id === id);
   if (!it) return;
-  App.sheet = { editId: id, text: it.text || '', type: it.type || null, category: it.category || null };
+  App.sheet = { editId: id, text: it.text || '', type: it.type || null, category: it.category || null,
+                insistence: it.insistence || 'chill', cadenceDays: it.cadenceDays || 7 };
   renderSheet();
 }
 function closeSheet() { App.sheet = null; const o = document.getElementById('ov'); if (o) o.remove(); }
@@ -123,6 +132,19 @@ function renderSheet() {
     `<span class="chip ${s.type === tp.id ? 'on' : ''}" data-type="${tp.id}">${tp.label}</span>`).join('');
   const catChips = cats.map((c) =>
     `<span class="chip ${s.category === c.id ? 'on' : ''}" data-catchip="${esc(c.id)}">${c.icon} ${esc(c.label)}</span>`).join('');
+  const INSIST_CHIPS = [['chill', '😴 Chill'], ['nudge', '👋 Dult'], ['nag', '📣 Masete']];
+  const insistRow = s.type === 'someday'
+    ? `<div class="lab">Hvor mye skal den mase?</div><div class="chips">`
+      + INSIST_CHIPS.map(([k, l]) =>
+          `<span class="chip ${s.insistence === k ? 'on' : ''}" data-insist="${k}">${l}</span>`).join('')
+      + `</div>`
+      + (s.insistence === 'nudge'
+          ? `<div class="lab">Kom tilbake hver…</div><div class="chips">`
+            + [3, 7, 14, 30].map((d) =>
+                `<span class="chip ${s.cadenceDays === d ? 'on' : ''}" data-cad="${d}">${d} dager</span>`).join('')
+            + `</div>`
+          : '')
+    : '';
   const remindRow = s.type === 'reminder'
     ? `<div class="lab">Minn meg om…</div><div class="chips">`
       + App.state.settings.remindPresets.map((m) =>
@@ -131,6 +153,7 @@ function renderSheet() {
   const html = `<div class="overlay" id="ov"><div class="sheet">`
     + `<input class="inp" id="capText" placeholder="Hva skal du ikke glemme?" value="${esc(s.text)}">`
     + `<div class="lab">Hva er dette? (valgfritt)</div><div class="chips">${typeChips}</div>`
+    + insistRow
     + remindRow
     + `<div class="lab">Kategori (valgfritt)</div><div class="chips">${catChips}</div>`
     + `<button class="btn" id="capSave">${s.editId ? 'Lagre endringer' : 'Lagre'}</button>`
@@ -150,6 +173,10 @@ function bindSheet() {
     App.sheet.type = App.sheet.type === el.dataset.type ? null : el.dataset.type; renderSheet(); });
   o.querySelectorAll('[data-catchip]').forEach((el) => el.onclick = () => {
     App.sheet.category = App.sheet.category === el.dataset.catchip ? null : el.dataset.catchip; renderSheet(); });
+  o.querySelectorAll('[data-insist]').forEach((el) => el.onclick = () => {
+    App.sheet.insistence = el.dataset.insist; renderSheet(); });
+  o.querySelectorAll('[data-cad]').forEach((el) => el.onclick = () => {
+    App.sheet.cadenceDays = Number(el.dataset.cad); renderSheet(); });
   o.querySelectorAll('[data-remind]').forEach((el) => el.onclick = () => {
     App.sheet._remindMin = Number(el.dataset.remind);
     o.querySelectorAll('[data-remind]').forEach((x) => x.classList.remove('on'));
@@ -178,6 +205,10 @@ function saveSheet() {
     next = L.setItemCategory(next, { id, category: s.category }, { now: c.now, id: newId() });
   } else {
     next = L.addItem(App.state, { text: s.text, type: s.type, category: s.category }, c);
+  }
+  if (s.type === 'someday') {
+    next = L.setInsistence(next, { id, insistence: s.insistence, cadenceDays: s.cadenceDays },
+                           { now: c.now, id: newId() });
   }
   if (s.type === 'reminder' && s._remindMin) {
     next = L.setReminder(next, { id, remindAt: L.addMinutesIso(c.now, s._remindMin) },
@@ -239,17 +270,67 @@ function renderCategory() {
     + `</div>`;
 }
 
+function nudgeRowHtml(it) {
+  return `<div class="row"><span class="chk" data-done="${it.id}"></span>`
+    + `<div class="rtxt" data-edit="${it.id}"><div class="t">${esc(it.text)}</div>`
+    + `<div class="m">👋 hver ${it.cadenceDays || 7}. dag</div></div>`
+    + `<button class="mini" data-promote="${it.id}">I dag</button>`
+    + `<button class="mini" data-msnooze="${it.id}">Dult igjen</button></div>`;
+}
+
 function renderInbox() {
-  const items = L.inboxItems(App.state, nowIso());
+  const now = nowIso();
+  const all = L.inboxItems(App.state, now);
+  const nudge = all.filter((i) => L.nudgeDue(i, now));
+  const fresh = all.filter((i) => i.type == null);
+  const freshCard = fresh.length ? listCard(fresh) : (nudge.length ? '' : `<p class="sub">Innboksen er tom 🌱</p>`);
+  const nudgeCard = nudge.length
+    ? `<h2>👋 Dult – på tide igjen?</h2><div class="card">${nudge.map(nudgeRowHtml).join('')}</div>`
+    : '';
   return headerBar('📥 Innboks')
-    + `<div class="body"><p class="sub">Fanget uten type. Trykk for å klassifisere eller slette.</p>`
-    + listCard(items) + `</div>`;
+    + `<div class="body"><p class="sub">Fanget uten type, og saker på sikt som melder seg igjen.</p>`
+    + freshCard + nudgeCard + `</div>`;
 }
 
 function renderToday() {
   const items = L.itemsForToday(App.state, nowIso());
   return headerBar('📌 I dag')
     + `<div class="body"><p class="sub">Det som krever deg nå.</p>` + listCard(items) + `</div>`;
+}
+
+function daysUntil(iso) {
+  const ms = new Date(iso).getTime() - Date.now();
+  return Math.max(0, Math.ceil(ms / 86400000));
+}
+
+function mediumRowHtml(it) {
+  const now = nowIso();
+  const chk = `<span class="chk ${it.done ? 'on' : ''}" data-done="${it.id}"></span>`;
+  const meta = [];
+  if (it.insistence === 'nudge') {
+    if (it.resurfaceAt && it.resurfaceAt <= now) meta.push('👋 klar nå');
+    else if (it.resurfaceAt) meta.push('👋 om ' + daysUntil(it.resurfaceAt) + ' d');
+  }
+  return `<div class="row">${chk}`
+    + `<div class="rtxt" data-edit="${it.id}"><div class="t">${esc(it.text)}</div>`
+    + (meta.length ? `<div class="m">${esc(meta.join(' · '))}</div>` : '')
+    + `</div>`
+    + `<button class="mini" data-promote="${it.id}">I dag</button></div>`;
+}
+
+function renderMedium() {
+  const items = L.mediumItems(App.state);
+  const groups = [['nag', '📣 Masete'], ['nudge', '👋 Dult'], ['chill', '😴 Chill']];
+  let body = '';
+  groups.forEach(([key, label]) => {
+    const g = items.filter((i) => (i.insistence || 'chill') === key);
+    if (g.length) body += `<h2>${label}</h2><div class="card">${g.map(mediumRowHtml).join('')}</div>`;
+  });
+  if (!body) body = `<p class="sub">Ingenting her ennå. Fang noe som «💛 På et tidspunkt».</p>`;
+  return headerBar('💛 På et tidspunkt')
+    + `<div class="body">`
+    + `<div class="capbar" data-cap="1" data-captype="someday"><span class="p">＋</span> Fang noe til senere…</div>`
+    + body + `</div>`;
 }
 
 const WD = [['mon', 'Man'], ['tue', 'Tir'], ['wed', 'Ons'], ['thu', 'Tor'], ['fri', 'Fre'], ['sat', 'Lør'], ['sun', 'Søn']];

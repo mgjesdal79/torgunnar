@@ -76,16 +76,31 @@ Tilpasset fra Honniscoins' modne rutine-modell, strippet for poeng/godkjenning/f
   `generateRoutineInstances(state, today)`, `wakeRoutine(state,{id},ctx)` (NY: materialiser sovende
   instans i dag), `expireStaleRoutineInstances`, `toggleRoutineSubtask`, `allSubtasksDone`.
 
-### 2. Mellomlang liste – «masete vs. chill» 💤
+### 2. Mellomlang liste – «På et tidspunkt» 💛 (FASE 2 – låst)
 
 Ting kona nevner som ikke skal gjøres nå («Husk nye støvler til datter»). Løser «jeg aner ikke
 hvordan jeg rigger meg til senere» ved at **saken husker det for deg** og kommer tilbake i egen rytme.
 
-- Gjenbruk defer/resurfacing-motoren, men gjør den **gjentakende per sak** med tre maste-nivåer:
-  - **Chill** – ligger bare klar, ingen badge, dukker opp når du åpner lista.
-  - **Dult** – kommer tilbake / badger med valgt mellomrom (f.eks. hver uke).
-  - **Masete** – badger daglig / dukker opp i «I dag» til du gjør den eller snoozer.
-- Felt på item, f.eks. `insistence: 'chill'|'nudge'|'nag'` + eksisterende `resurfaceAt`/cadence.
+**Beslutninger (låst 2026-10-16):**
+
+- **Gjenbruk `someday`-typen** («💛 På et tidspunkt»), som allerede fanges i fang-arket men ikke
+  vises noe sted i dag. Null nytt rør — bygger ut eksisterende type + resurfacing-motor.
+- **Egen flis `💛 På et tidspunkt` på hjem-grid-et**, likestilt med Hjem/Jobb/Handle-kategoriene
+  og I dag/Innboks/Rutiner. (Kategori-redigering ble vurdert og **droppet** i samme runde.)
+- Tre maste-nivåer via nytt felt `insistence: 'chill'|'nudge'|'nag'` (default `chill`) + `cadenceDays`:
+  - **😴 Chill** – ligger bare i lista, ingen badge, dukker opp når du åpner flaten.
+  - **👋 Dult** – dukker opp i **Innboks** når intervallet (valgt per sak: 3/7/14/30 dager) er gått.
+    I innboksen: ✓ gjort · «I dag» · «Dult igjen» (nullstiller rytmen). Kanal = Innboks (badge finnes alt).
+  - **📣 Masete** – **vedvarende badge på 💛-flisen** til saken er gjort/fjernet. Maser bevisst
+    IKKE inn i «I dag» (mildere enn tidligere utkast; mer pull-tro).
+- **Flate:** seksjoner «📣 Masete» · «👋 Dult» · «😴 Chill». Rad: avkryss (gjort → forsvinner),
+  trykk tekst → rediger, mini-knapp «I dag» = promoter til `task` m/ forfall i dag (→ I dag-lista).
+- **Fang-/rediger-arket:** når type = «På et tidspunkt» velges, vises insistence-chips + (ved Dult)
+  dager-presets.
+- **Rene fn (nye + tester):** `setInsistence`, `snoozeNudge` (dult igjen), `promoteToToday`,
+  `nudgeDue(item,now)`, `mediumItems`, `mediumBadge` (nag-count), utvidet `inboxItems` (tar med
+  forfalte dult-saker). Items-merge (LWW per id) dekker de nye feltene — ingen synk-endring.
+- **Null regresjon:** someday vises ingen andre steder i dag, så eksisterende item-visninger røres ikke.
 
 ### 3. iOS-påminnelser (spesifikke, på tidspunkt) ⏰
 
