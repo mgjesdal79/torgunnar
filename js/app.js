@@ -38,7 +38,9 @@ function renderHome() {
     tileHtml(c.icon, c.label, L.categoryBadge(App.state, c.id, now), `data-cat="${esc(c.id)}"`)).join('');
   const inboxN = L.inboxItems(App.state, now).length;
   const todayN = L.itemsForToday(App.state, now).length;
-  const special = tileHtml('📥', 'Innboks', { count: inboxN, level: inboxN ? 'hot' : 'calm' }, 'data-view="inbox"')
+  const mediumN = L.mediumBadge(App.state);
+  const special = tileHtml('💛', 'På et tidspunkt', mediumN, 'data-view="medium"')
+    + tileHtml('📥', 'Innboks', { count: inboxN, level: inboxN ? 'hot' : 'calm' }, 'data-view="inbox"')
     + tileHtml('📌', 'I dag', { count: todayN, level: todayN ? 'open' : 'calm' }, 'data-view="today"')
     + tileHtml('🔁', 'Rutiner', null, 'data-view="routines"')
     + tileHtml('⚙️', 'Innstillinger', null, 'data-view="settings"');
@@ -55,6 +57,7 @@ function render() {
   if (v === 'category') root.innerHTML = renderCategory();
   else if (v === 'inbox') root.innerHTML = renderInbox();
   else if (v === 'today') root.innerHTML = renderToday();
+  else if (v === 'medium') root.innerHTML = renderMedium();
   else if (v === 'routines') root.innerHTML = renderRoutines();
   else if (v === 'settings') root.innerHTML = renderSettings();
   else root.innerHTML = renderHome();
@@ -95,6 +98,10 @@ function bind(root) {
     el.onclick = () => openRoutineEditor(null));
   root.querySelectorAll('[data-redit]').forEach((el) =>
     el.onclick = () => openRoutineEditor(el.dataset.redit));
+  root.querySelectorAll('[data-promote]').forEach((el) =>
+    el.onclick = () => commit(L.promoteToToday(App.state, { id: el.dataset.promote }, ctx())));
+  root.querySelectorAll('[data-msnooze]').forEach((el) =>
+    el.onclick = () => commit(L.snoozeNudge(App.state, { id: el.dataset.msnooze }, ctx())));
 }
 
 const TYPES = [
@@ -250,6 +257,41 @@ function renderToday() {
   const items = L.itemsForToday(App.state, nowIso());
   return headerBar('📌 I dag')
     + `<div class="body"><p class="sub">Det som krever deg nå.</p>` + listCard(items) + `</div>`;
+}
+
+function daysUntil(iso) {
+  const ms = new Date(iso).getTime() - Date.now();
+  return Math.max(0, Math.ceil(ms / 86400000));
+}
+
+function mediumRowHtml(it) {
+  const now = nowIso();
+  const chk = `<span class="chk ${it.done ? 'on' : ''}" data-done="${it.id}"></span>`;
+  const meta = [];
+  if (it.insistence === 'nudge') {
+    if (it.resurfaceAt && it.resurfaceAt <= now) meta.push('👋 klar nå');
+    else if (it.resurfaceAt) meta.push('👋 om ' + daysUntil(it.resurfaceAt) + ' d');
+  }
+  return `<div class="row">${chk}`
+    + `<div class="rtxt" data-edit="${it.id}"><div class="t">${esc(it.text)}</div>`
+    + (meta.length ? `<div class="m">${esc(meta.join(' · '))}</div>` : '')
+    + `</div>`
+    + `<button class="mini" data-promote="${it.id}">I dag</button></div>`;
+}
+
+function renderMedium() {
+  const items = L.mediumItems(App.state);
+  const groups = [['nag', '📣 Masete'], ['nudge', '👋 Dult'], ['chill', '😴 Chill']];
+  let body = '';
+  groups.forEach(([key, label]) => {
+    const g = items.filter((i) => (i.insistence || 'chill') === key);
+    if (g.length) body += `<h2>${label}</h2><div class="card">${g.map(mediumRowHtml).join('')}</div>`;
+  });
+  if (!body) body = `<p class="sub">Ingenting her ennå. Fang noe som «💛 På et tidspunkt».</p>`;
+  return headerBar('💛 På et tidspunkt')
+    + `<div class="body">`
+    + `<div class="capbar" data-cap="1" data-captype="someday"><span class="p">＋</span> Fang noe til senere…</div>`
+    + body + `</div>`;
 }
 
 const WD = [['mon', 'Man'], ['tue', 'Tir'], ['wed', 'Ons'], ['thu', 'Tor'], ['fri', 'Fre'], ['sat', 'Lør'], ['sun', 'Søn']];
