@@ -310,8 +310,10 @@ function listCard(items) {
 }
 
 function headerBar(title) {
-  return `<div class="banner"><button class="back" data-home="1">‹ Hjem</button>`
-    + `<div class="b">${esc(title)}</div></div>`;
+  return `<div class="banner topnav" data-home="1" role="button" title="Til hjem">`
+    + `<span class="back">‹</span>`
+    + `<div class="b">${esc(title)}</div>`
+    + `<span class="homeic">⌂</span></div>`;
 }
 
 function taskRowHtml(it) {
