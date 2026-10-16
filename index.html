@@ -78,13 +78,19 @@
   .wdrow{display:flex;flex-wrap:wrap;gap:6px}
   .progbar{height:4px;border-radius:3px;background:var(--line);margin:0 2px 8px;overflow:hidden}
   .progbar>i{display:block;height:100%;background:var(--bamboo)}
+  .build{text-align:center;color:var(--faint);font-size:11px;letter-spacing:.04em;
+    padding:10px 0 calc(16px + env(safe-area-inset-bottom))}
 </style>
 </head>
 <body>
 <div id="app"></div>
+<footer class="build" id="build"></footer>
 <script>window.EDGE_FUNCTION_URL = '';</script>
 <script type="module">
-  window.APP_VERSION = '2';
+  window.APP_VERSION = '3';
+  window.APP_BUILD = '2026-10-16';
+  const b = document.getElementById('build');
+  if (b) b.textContent = 'build ' + window.APP_VERSION + ' · ' + window.APP_BUILD;
   import('./js/app.js?cb=' + window.APP_VERSION);
 </script>
 <script>
