@@ -42,10 +42,12 @@ function renderHome() {
   const inboxN = L.inboxItems(App.state, now).length;
   const todayItems = L.itemsForToday(App.state, now);
   const taskN = L.taskItems(App.state, now).length;
+  const jobN = L.jobItems(App.state, now).length;
   const mediumN = L.mediumBadge(App.state);
   const konaN = L.konaBadge(App.state);
   const tiles = tileHtml('📥', 'Innboks', { count: inboxN, level: inboxN ? 'hot' : 'calm' }, 'data-view="inbox"')
     + tileHtml('✅', 'Gjøremål', { count: taskN, level: taskN ? 'open' : 'calm' }, 'data-view="tasks"')
+    + tileHtml('💼', 'Jobb', { count: jobN, level: jobN ? 'open' : 'calm' }, 'data-view="job"')
     + tileHtml('💛', 'Langsiktig', mediumN, 'data-view="medium"')
     + tileHtml('📝', 'Notater', null, 'data-view="notes"')
     + tileHtml('💬', 'Ingrid', konaN, 'data-view="kona"')
@@ -69,6 +71,7 @@ function render() {
   if (v === 'inbox') root.innerHTML = renderInbox();
   else if (v === 'today') root.innerHTML = renderToday();
   else if (v === 'tasks') root.innerHTML = renderTasks();
+  else if (v === 'job') root.innerHTML = renderJob();
   else if (v === 'medium') root.innerHTML = renderMedium();
   else if (v === 'notes') root.innerHTML = renderNotes();
   else if (v === 'kona') root.innerHTML = renderKona();
@@ -177,11 +180,15 @@ function bind(root) {
   }
 }
 
-const CAPTURE_TYPES = [
+// Ekte item-typer (brukes i redigering). Ingrid er en kilde, ikke en type.
+const EDIT_TYPES = [
   { id: 'task', label: '✅ Gjøremål' },
+  { id: 'job', label: '💼 Jobb' },
   { id: 'someday', label: '💛 Langsiktig' },
   { id: 'note', label: '📝 Notat' },
 ];
+// Valg i «Fang en tanke» = typene + Ingrid (sender tanken til Ingrid-lista).
+const CAPTURE_TYPES = EDIT_TYPES.concat([{ id: 'ingrid', label: '💬 Ingrid' }]);
 const INSIST_CHIPS = [['chill', '😴 Chill'], ['nudge', '👋 Dult'], ['nag', '📣 Masete']];
 
 // Felles innmat for både fange- og redigeringsskjema. prefix = 'cap' | 'edit'.
@@ -225,17 +232,26 @@ function submitCapture() {
   const cap = App.cap;
   const text = (cap.text || '').trim();
   if (!text) return;
-  const type = App.capFixed || cap.type || 'task';
+  const choice = App.capFixed || cap.type || 'task';
   const c = ctx();
   const id = c.id;
-  let next = L.addItem(App.state, { text, type }, c);
-  if (type === 'someday') {
+  const stay = App.capStay;
+  const reset = () => { App.cap = { text: '', type: 'task', insistence: 'chill', cadenceDays: 7 }; };
+  // Ingrid er en kilde, ikke en type → lapp til Ingrid-lista.
+  if (choice === 'ingrid') {
+    const next = L.addItem(App.state, { text, source: 'kona' }, c);
+    reset();
+    if (!stay) App.view = 'kona';
+    App.state = next; saveStateDebounced(App.state); render();
+    return;
+  }
+  let next = L.addItem(App.state, { text, type: choice }, c);
+  if (choice === 'someday') {
     next = L.setInsistence(next, { id, insistence: cap.insistence, cadenceDays: cap.cadenceDays },
                            { now: c.now, id: newId() });
   }
-  const stay = App.capStay;
-  App.cap = { text: '', type: 'task', insistence: 'chill', cadenceDays: 7 };
-  if (!stay) App.view = { task: 'tasks', someday: 'medium', note: 'notes' }[type] || 'tasks';
+  reset();
+  if (!stay) App.view = { task: 'tasks', job: 'job', someday: 'medium', note: 'notes' }[choice] || 'tasks';
   App.state = next; saveStateDebounced(App.state); render();
 }
 
@@ -245,7 +261,7 @@ function isEditing(id) { return App.edit && App.edit.id === id; }
 function openEdit(id) {
   const it = App.state.items.find((i) => i.id === id);
   if (!it) return;
-  const type = ['task', 'someday', 'note'].includes(it.type) ? it.type : 'task';
+  const type = ['task', 'job', 'someday', 'note'].includes(it.type) ? it.type : 'task';
   App.edit = { id, text: it.text || '', type,
                insistence: it.insistence || 'chill', cadenceDays: it.cadenceDays || 7 };
   render();
@@ -253,7 +269,7 @@ function openEdit(id) {
 
 function editForm() {
   const e = App.edit;
-  const typeChips = CAPTURE_TYPES.map((tp) =>
+  const typeChips = EDIT_TYPES.map((tp) =>
     `<span class="chip ${e.type === tp.id ? 'on' : ''}" data-edittype="${tp.id}">${tp.label}</span>`).join('');
   return `<div class="editrow">`
     + `<textarea class="inp" id="editInput" rows="2" placeholder="Endre teksten…">${esc(e.text)}</textarea>`
@@ -308,7 +324,7 @@ function itemRowHtml(it) {
   if (it.due) meta.push('🗓 ' + it.due);
   if (it.remindAt) meta.push('⏰ ' + fmtTime(it.remindAt));
   if (it.deferred && it.resurfaceAt && !L.isResurfaced(it, now)) meta.push('💤 tilbake ' + fmtDate(it.resurfaceAt));
-  const typeLabel = { note: 'Notat', task: 'Gjøremål', reminder: 'Påminnelse', someday: 'Langsiktig' }[it.type] || 'Uklassifisert';
+  const typeLabel = { note: 'Notat', task: 'Gjøremål', job: 'Jobb', reminder: 'Påminnelse', someday: 'Langsiktig' }[it.type] || 'Uklassifisert';
   return `<div class="row">${chk}`
     + `<div class="rtxt ${it.done ? 'done' : ''}" data-edit="${it.id}"><div class="t">${esc(it.text)}</div>`
     + (meta.length ? `<div class="m">${esc(meta.join(' · '))}</div>` : '')
@@ -361,6 +377,17 @@ function renderTasks() {
   return headerBar('✅ Gjøremål')
     + `<div class="body">`
     + captureBlock({ fixedType: 'task', placeholder: 'Nytt gjøremål…' })
+    + body + `</div>`;
+}
+
+function renderJob() {
+  const items = L.jobItems(App.state, nowIso());
+  const body = items.length
+    ? items.map(taskRowHtml).join('')
+    : `<p class="sub">Ingen jobb-gjøremål nå 🌱</p>`;
+  return headerBar('💼 Jobb')
+    + `<div class="body">`
+    + captureBlock({ fixedType: 'job', placeholder: 'Nytt jobb-gjøremål…' })
     + body + `</div>`;
 }
 

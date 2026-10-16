@@ -212,6 +212,17 @@ export function taskItems(state, now) {
     });
 }
 
+export function jobItems(state, now) {
+  return activeItems(state)
+    .filter((i) => i.type === 'job' && !i.done && isResurfaced(i, now))
+    .sort((a, b) => {
+      if (a.remindAt && b.remindAt) return a.remindAt.localeCompare(b.remindAt);
+      if (a.remindAt) return -1;
+      if (b.remindAt) return 1;
+      return (b.createdAt || '').localeCompare(a.createdAt || '');
+    });
+}
+
 export function noteItems(state) {
   return activeItems(state)
     .filter((i) => i.type === 'note')
