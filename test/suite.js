@@ -1,5 +1,5 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, noteItems, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge } from '../js/logic.js';
-const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge, taskItems, noteItems, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName };
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, noteItems, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes } from '../js/logic.js';
+const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge, taskItems, noteItems, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes };
 
 export function runTests() {
   const results = [];
@@ -622,6 +622,74 @@ export function runTests() {
     eq(s.settings.updatedAt, 'N');
     s = L.setShortcutName(s, { name: '' }, { now: 'N2' });
     eq(s.settings.shortcutName, 'TorGunnar');
+  });
+
+  // --- chille quotes (build 7) ---
+  t('getQuotes faller tilbake til standardlista når tom', () => {
+    const s = defaultState();
+    eq(L.getQuotes(s), L.DEFAULT_QUOTES);
+    ok(L.DEFAULT_QUOTES.length === 30, 'forventet 30 standard-quotes');
+  });
+  t('getQuotes bruker egen liste og ignorerer tomme linjer', () => {
+    const s = defaultState();
+    s.settings.quotes = ['  Ro  ', '', '   ', 'Pust'];
+    eq(L.getQuotes(s), ['Ro', 'Pust']);
+  });
+  t('getQuotes faller tilbake når egen liste kun er tomme linjer', () => {
+    const s = defaultState();
+    s.settings.quotes = ['  ', ''];
+    eq(L.getQuotes(s), L.DEFAULT_QUOTES);
+  });
+  t('quoteForDay er deterministisk: samme dato → samme quote', () => {
+    const s = defaultState();
+    eq(L.quoteForDay(s, '2026-10-16'), L.quoteForDay(s, '2026-10-16'));
+  });
+  t('quoteForDay bytter quote fra dag til dag', () => {
+    const s = defaultState();
+    s.settings.quotes = ['A', 'B', 'C'];
+    const a = L.quoteForDay(s, '2026-10-16');
+    const b = L.quoteForDay(s, '2026-10-17');
+    ok(a !== b, 'forventet ulik quote neste dag: ' + a + ' / ' + b);
+  });
+  t('quoteForDay håndterer full ISO-streng (slicer til dato)', () => {
+    const s = defaultState();
+    eq(L.quoteForDay(s, '2026-10-16T09:30:00.000Z'), L.quoteForDay(s, '2026-10-16'));
+  });
+  t('currentQuote bruker dagens quote uten pin', () => {
+    const s = defaultState();
+    eq(L.currentQuote(s, '2026-10-16'), L.quoteForDay(s, '2026-10-16'));
+  });
+  t('currentQuote respekterer pin fra i dag', () => {
+    const s = defaultState();
+    s.settings.quotePin = { date: '2026-10-16', text: 'Min egen ro' };
+    eq(L.currentQuote(s, '2026-10-16'), 'Min egen ro');
+  });
+  t('currentQuote ignorerer utdatert pin (annen dag)', () => {
+    const s = defaultState();
+    s.settings.quotePin = { date: '2026-10-15', text: 'Gammel' };
+    eq(L.currentQuote(s, '2026-10-16'), L.quoteForDay(s, '2026-10-16'));
+  });
+  t('rotateQuote pinner en quote ≠ den som vises nå, for i dag', () => {
+    let s = defaultState();
+    s.settings.quotes = ['A', 'B', 'C'];
+    const before = L.currentQuote(s, '2026-10-16');
+    s = L.rotateQuote(s, { dayKey: '2026-10-16' }, { now: 'N', rand: 0.99 });
+    ok(s.settings.quotePin.text !== before, 'skal ikke velge samme som nå');
+    eq(s.settings.quotePin.date, '2026-10-16');
+    eq(L.currentQuote(s, '2026-10-16'), s.settings.quotePin.text);
+    eq(s.settings.updatedAt, 'N');
+  });
+  t('rotateQuote med én quote klarer seg uten å krasje', () => {
+    let s = defaultState();
+    s.settings.quotes = ['Bare én'];
+    s = L.rotateQuote(s, { dayKey: '2026-10-16' }, { now: 'N', rand: 0 });
+    eq(s.settings.quotePin.text, 'Bare én');
+  });
+  t('setQuotes splitter på linjeskift og trimmer', () => {
+    let s = defaultState();
+    s = L.setQuotes(s, { text: '  Ro  \n\nPust\n   \nSenk skuldrene' }, { now: 'N' });
+    eq(s.settings.quotes, ['Ro', 'Pust', 'Senk skuldrene']);
+    eq(s.settings.updatedAt, 'N');
   });
 
   return results;

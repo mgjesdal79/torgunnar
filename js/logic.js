@@ -11,6 +11,8 @@ export function defaultState() {
       shortcutName: 'TorGunnar',
       remindPresets: [60, 180],
       somedayNudgeDays: 7,
+      quotes: [],
+      quotePin: null,
       updatedAt: null,
     },
     items: [],
@@ -221,6 +223,89 @@ function bumpSettings(out, ctx) { out.settings.updatedAt = ctx.now; }
 export function setShortcutName(state, { name }, ctx) {
   const out = clone(state);
   out.settings.shortcutName = String(name || '').trim() || 'TorGunnar';
+  bumpSettings(out, ctx);
+  return out;
+}
+
+export const DEFAULT_QUOTES = [
+  'Ingenting haster akkurat nå.',
+  'Én ting av gangen.',
+  'Pust. Resten venter.',
+  'Det løser seg alltid.',
+  'Ro er også fremgang.',
+  'Du rekker det du rekker.',
+  'Ta det med ro – jeg har oversikten.',
+  'Verden kan vente litt.',
+  'Ingenting brenner i dag.',
+  'Sakte er fort nok.',
+  'Du trenger ikke gjøre alt nå.',
+  'Hvil er ikke sløsing.',
+  'Det viktigste er at du puster.',
+  'La skuldrene senke seg.',
+  'Alt som må huskes, husker jeg.',
+  'Ett steg. Så ett til.',
+  'Stress løser ingenting.',
+  'Gjør lite, gjør det rolig.',
+  'I morgen finnes også.',
+  'Du har tid.',
+  'Ro i kroppen, ro i hodet.',
+  'Det haster sjeldnere enn du tror.',
+  'Pause er lov.',
+  'Senk tempoet, ikke ambisjonene.',
+  'En ting mindre å bekymre seg for.',
+  'Det kommer til å gå bra.',
+  'Pust inn. Pust ut. Fortsett.',
+  'Du er god nok og du gjør nok.',
+  'La dagen komme til deg.',
+  'Rolig puls, klart hode.',
+];
+
+export function getQuotes(state) {
+  const list = ((state.settings && state.settings.quotes) || [])
+    .map((s) => String(s).trim()).filter(Boolean);
+  return list.length ? list : DEFAULT_QUOTES;
+}
+
+function dayNumber(dayKey) {
+  const parts = String(dayKey || '').slice(0, 10).split('-').map(Number);
+  const [y, m, d] = parts;
+  if (!y || !m || !d) return 0;
+  return Math.floor(Date.UTC(y, m - 1, d) / 86400000);
+}
+
+// Deterministisk daglig: samme dato → samme quote (ingen flimring ved refresh).
+export function quoteForDay(state, dayKey) {
+  const quotes = getQuotes(state);
+  const i = ((dayNumber(dayKey) % quotes.length) + quotes.length) % quotes.length;
+  return quotes[i];
+}
+
+// Det som faktisk vises: respekter en manuell pin fra i dag, ellers dagens quote.
+export function currentQuote(state, dayKey) {
+  const key = String(dayKey || '').slice(0, 10);
+  const pin = state.settings && state.settings.quotePin;
+  if (pin && pin.date === key && pin.text) return pin.text;
+  return quoteForDay(state, key);
+}
+
+// «Roter nå»: tilfeldig quote ≠ den som vises nå, pinnes resten av dagen.
+export function rotateQuote(state, { dayKey }, ctx) {
+  const key = String(dayKey || '').slice(0, 10);
+  const out = clone(state);
+  const quotes = getQuotes(out);
+  const now = currentQuote(out, key);
+  const options = quotes.length > 1 ? quotes.filter((q) => q !== now) : quotes;
+  const r = (ctx && ctx.rand != null) ? ctx.rand : Math.random();
+  const next = options[Math.floor(r * options.length) % options.length];
+  out.settings.quotePin = { date: key, text: next };
+  bumpSettings(out, ctx);
+  return out;
+}
+
+export function setQuotes(state, { text }, ctx) {
+  const out = clone(state);
+  out.settings.quotes = String(text || '')
+    .split('\n').map((s) => s.trim()).filter(Boolean);
   bumpSettings(out, ctx);
   return out;
 }

@@ -18,10 +18,10 @@ function esc(s) {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 
-function statusLine() {
-  const n = L.itemsForToday(App.state, nowIso()).length;
-  if (n === 0) return 'Ingenting haster akkurat nå 🌱';
-  return `${n} ${n === 1 ? 'ting venter' : 'ting venter'} i dag`;
+function quoteHtml() {
+  const q = L.currentQuote(App.state, todayIso());
+  return `<div class="quote" data-rotate="1" title="Trykk for en ny ro">`
+    + `🌿 <span class="qt">${esc(q)}</span> <span class="qrot">🔄</span></div>`;
 }
 
 function tileHtml(icon, label, badge, data) {
@@ -47,7 +47,7 @@ function renderHome() {
     + tileHtml('🔁', 'Rutiner', null, 'data-view="routines"')
     + tileHtml('⚙️', 'Innstillinger', null, 'data-view="settings"');
   return `<div class="banner"><div class="b">🦸‍♂️ Tor Gunnar</div>`
-    + `<div class="status">${esc(statusLine())}</div></div>`
+    + quoteHtml() + `</div>`
     + `<div class="body">`
     + `<div class="capbar" data-cap="1"><span class="p">＋</span> Fang en tanke…</div>`
     + `<div class="grid">${tiles}</div></div>`;
@@ -79,6 +79,8 @@ function bind(root) {
   if (cap) cap.onclick = () => openSheet(cap.dataset.captype || 'task');
   root.querySelectorAll('[data-home]').forEach((el) =>
     el.onclick = () => { App.view = 'home'; App.catId = null; render(); });
+  root.querySelectorAll('[data-rotate]').forEach((el) =>
+    el.onclick = () => commit(L.rotateQuote(App.state, { dayKey: todayIso() }, ctx())));
   root.querySelectorAll('[data-done]').forEach((el) =>
     el.onclick = () => doComplete(el.dataset.done, el));
   root.querySelectorAll('[data-defer]').forEach((el) =>
@@ -115,6 +117,13 @@ function bind(root) {
     const v = root.querySelector('#setShortcut').value;
     commit(L.setShortcutName(App.state, { name: v }, ctx()));
   };
+  const qSave = root.querySelector('#setQuotesSave');
+  if (qSave) qSave.onclick = () => {
+    const v = root.querySelector('#setQuotes').value;
+    commit(L.setQuotes(App.state, { text: v }, ctx()));
+  };
+  const qReset = root.querySelector('#setQuotesReset');
+  if (qReset) qReset.onclick = () => commit(L.setQuotes(App.state, { text: '' }, ctx()));
   const konaAdd = root.querySelector('#konaAdd');
   if (konaAdd) {
     const inp = root.querySelector('#konaText');
@@ -541,6 +550,11 @@ function renderSettings() {
     + `<p class="sub">Engangsoppsett på iPhone:</p>`
     + `<p class="sub">1) Lag en snarvei med akkurat dette navnet. Steg i snarveien: «Hent ordbok fra inndata» → «Hent ordbokverdi» for <b>title</b> og <b>due</b> → «Dato» på due → «Opprett påminnelse» (tittel = title, forfall = datoen).</p>`
     + `<p class="sub">2) Slå på <b>Innstillinger → Varsler → Påminnelser → Tidssensitive varsler</b> så de bryter gjennom Fokus.</p>`
+    + `<h2>Rolige sitater</h2>`
+    + `<p class="sub">Vises under Tor Gunnar hver dag. Én per linje. Tom = standardlista.</p>`
+    + `<textarea class="inp" id="setQuotes" rows="8">${esc((App.state.settings.quotes || []).join('\n'))}</textarea>`
+    + `<button class="btn" id="setQuotesSave">Lagre sitater</button>`
+    + `<button class="btn ghost" id="setQuotesReset">Tilbakestill til standard</button>`
     + `</div>`;
 }
 
