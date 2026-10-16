@@ -1,4 +1,4 @@
-// PandaCoins ren logikk. Ingen DOM/nett/globaler.
+// Tor Gunnar ren logikk. Ingen DOM/nett/globaler.
 
 export function clone(s) { return JSON.parse(JSON.stringify(s)); }
 
