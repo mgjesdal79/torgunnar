@@ -426,6 +426,42 @@ export function runTests() {
     s = L.setInsistence(s, { id: 'm1', insistence: 'chill' }, { now: '2026-10-16T08:00:00.000Z' });
     eq(s.items[0].cadenceDays, null); eq(s.items[0].resurfaceAt, null);
   });
+  t('nudgeDue: forfalt dult-sak er due, framtidig er ikke', () => {
+    let s = somedayState();
+    s = L.setInsistence(s, { id: 'm1', insistence: 'nudge', cadenceDays: 7 }, { now: '2026-10-16T08:00:00.000Z' });
+    eq(L.nudgeDue(s.items[0], '2026-10-20T08:00:00.000Z'), false);
+    eq(L.nudgeDue(s.items[0], '2026-10-30T08:00:00.000Z'), true);
+  });
+  t('nudgeDue: chill-sak er aldri due', () => {
+    let s = somedayState();
+    s = L.setInsistence(s, { id: 'm1', insistence: 'chill' }, { now: '2026-10-16T08:00:00.000Z' });
+    eq(L.nudgeDue(s.items[0], '2026-11-30T08:00:00.000Z'), false);
+  });
+  t('inboxItems tar med forfalt dult-sak + uklassifisert', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'Uklar' }, { now: '2026-10-16T08:00:00.000Z', id: 'u1' });
+    s = addItem(s, { text: 'Støvler', type: 'someday' }, { now: '2026-10-16T08:00:00.000Z', id: 'm1' });
+    s = L.setInsistence(s, { id: 'm1', insistence: 'nudge', cadenceDays: 7 }, { now: '2026-10-16T08:00:00.000Z' });
+    const ids = inboxItems(s, '2026-10-30T08:00:00.000Z').map((i) => i.id).sort();
+    eq(ids, ['m1', 'u1']);
+    const ids2 = inboxItems(s, '2026-10-20T08:00:00.000Z').map((i) => i.id);
+    eq(ids2, ['u1']);
+  });
+  t('snoozeNudge flytter resurfaceAt fram med cadence', () => {
+    let s = somedayState();
+    s = L.setInsistence(s, { id: 'm1', insistence: 'nudge', cadenceDays: 3 }, { now: '2026-10-16T08:00:00.000Z' });
+    s = L.snoozeNudge(s, { id: 'm1' }, { now: '2026-10-25T08:00:00.000Z' });
+    eq(s.items[0].resurfaceAt, '2026-10-28T08:00:00.000Z');
+  });
+  t('promoteToToday gjør someday til task med forfall i dag', () => {
+    let s = somedayState();
+    s = L.setInsistence(s, { id: 'm1', insistence: 'nag' }, { now: '2026-10-16T08:00:00.000Z' });
+    s = L.promoteToToday(s, { id: 'm1' }, { now: '2026-10-16T08:00:00.000Z' });
+    const it = s.items[0];
+    eq(it.type, 'task'); eq(it.due, '2026-10-16'); eq(it.insistence, null);
+    const today = itemsForToday(s, '2026-10-16T09:00:00.000Z').map((i) => i.id);
+    eq(today, ['m1']);
+  });
 
   return results;
 }

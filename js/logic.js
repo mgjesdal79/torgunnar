@@ -137,7 +137,8 @@ export function isPending(item, now) {
 function dayOf(iso) { return (iso || '').slice(0, 10); }
 
 export function inboxItems(state, now) {
-  return activeItems(state).filter((i) => i.type == null && isResurfaced(i, now));
+  return activeItems(state).filter((i) =>
+    (i.type == null && isResurfaced(i, now)) || nudgeDue(i, now));
 }
 
 export function itemsForToday(state, now) {
@@ -409,8 +410,29 @@ export function setInsistence(state, { id, insistence, cadenceDays }, ctx) {
   }, ctx);
 }
 
-export function nudgeDue(item, now) { return false; }
-export function snoozeNudge(state, payload, ctx) { return state; }
-export function promoteToToday(state, payload, ctx) { return state; }
+export function nudgeDue(item, now) {
+  return !!item && !item.removed && !item.done
+    && item.type === 'someday' && item.insistence === 'nudge'
+    && !!item.resurfaceAt && item.resurfaceAt <= now;
+}
+
+export function snoozeNudge(state, { id }, ctx) {
+  return patchItem(state, id, (it) => {
+    const days = it.cadenceDays || 7;
+    it.resurfaceAt = addMinutesIso(ctx.now, days * 1440);
+  }, ctx);
+}
+
+export function promoteToToday(state, { id }, ctx) {
+  return patchItem(state, id, (it) => {
+    it.type = 'task';
+    it.due = (ctx.now || '').slice(0, 10);
+    it.insistence = null;
+    it.cadenceDays = null;
+    it.resurfaceAt = null;
+    it.deferred = false;
+  }, ctx);
+}
+
 export function mediumItems(state) { return []; }
 export function mediumBadge(state) { return { count: 0, level: 'calm' }; }
