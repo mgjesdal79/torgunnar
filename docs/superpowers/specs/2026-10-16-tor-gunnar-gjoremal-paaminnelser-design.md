@@ -52,9 +52,13 @@ lever også i Tor Gunnar (ingen synk tilbake – akseptert).
   at.slice(0,10)`; setter `type='task'` hvis mangler. (Så gjøremålet dukker opp i
   «I dag» på rett dato og fyrer i «I dag» når tiden er inne.)
 - `markPushedToIos(state, { id }, ctx)` – setter `iosPushedAt = ctx.now`.
-- `buildShortcutUrl(shortcutName, { title, at })` – ren bygger:
-  `shortcuts://run-shortcut?name=<enc(name)>&input=<enc(JSON)>` der JSON =
-  `{"title":..., "due": at}`. Testbar.
+- `buildShortcutUrl(shortcutName, { title, due })` – ren bygger. Apples faktiske
+  skjema krever `input=text` + egen `text`-param (ikke `input=<tekst>`):
+  `shortcuts://run-shortcut?name=<enc(name)>&input=text&text=<enc(JSON)>` der JSON =
+  `{"title": title, "due": due}`. Alt url-enkodet. Testbar.
+  - `due` sendes som **lokal** «YYYY-MM-DD HH:mm» (ikke UTC-ISO med `Z`), så snarveiens
+    dato-tolkning treffer riktig klokkeslett. App-laget formaterer fra lagret `remindAt`
+    (som er ISO/UTC for intern sammenligning) til lokal streng før kallet.
 
 ### Uendret / gjenbrukt
 - `itemsForToday` dekker allerede `task` med `remindAt<=now` eller `due<=today`.
@@ -82,8 +86,11 @@ lever også i Tor Gunnar (ingen synk tilbake – akseptert).
 - Bekreft → `scheduleTask(id, at)` → lukk → render.
 
 ### Legg i Påminnelser (`pushToIos(id)`)
-- Bygger `buildShortcutUrl(settings.shortcutName, {title, at: remindAt})` →
-  `window.location.href = url` (brukergest fra knappetrykk) → `markPushedToIos(id)`.
+- Formaterer `remindAt` → lokal «YYYY-MM-DD HH:mm», bygger
+  `buildShortcutUrl(settings.shortcutName, {title, due})` → `window.location.href = url`
+  (brukergest fra knappetrykk) → `markPushedToIos(id)`.
+- Åpner Shortcuts (ev. «Åpne i Snarveier?»-prompt første gang); etter kjøring er man i
+  Snarveier-appen og bytter tilbake til Safari manuelt. Akseptert.
 
 ### Notater-visning (`renderNotes`)
 - Enkel liste over `noteItems` (rediger via rad = `openEdit`).
@@ -98,13 +105,24 @@ lever også i Tor Gunnar (ingen synk tilbake – akseptert).
 ### Innstillinger
 - Vis/rediger `shortcutName` (default `TorGunnar`) + kort hjelpetekst om snarveien.
 
-## iOS-Snarvei (leveres som oppskrift, bygges av Martin én gang)
+## iOS-Snarvei + engangsoppsett (bygges av Martin én gang)
 
-Snarvei `TorGunnar` som:
-1. Tar imot tekst (Shortcut Input).
-2. «Get Dictionary from Input» (JSON).
-3. Henter `title` og `due`.
-4. «Add New Reminder» med tittel = title, alarm/forfall = due (ISO 8601).
+Snarvei `TorGunnar`:
+1. Tar imot tekst (Shortcut Input, type Tekst).
+2. **Get Dictionary from Input** (parser JSON-teksten).
+3. **Get Dictionary Value** → `title`. **Get Dictionary Value** → `due`.
+4. **Date** (eller «Get Dates from Input») på `due` → gjør teksten om til en ekte Date.
+   (Steg som manglet i første utkast; «Add/Create Reminder» krever Date, ikke tekst.)
+5. **Create Reminder** (iOS 26) / **Add New Reminder**: Tittel = `title`, Forfall/alarm
+   = Date fra steg 4 (med klokkeslett). Valgfri fast liste, f.eks. «Tor Gunnar».
+
+### Engangs-innstilling for «tidskritisk» (valgt strategi: global Tidssensitiv)
+- **Innstillinger → Varsler → Påminnelser → Tidssensitive varsler = PÅ.**
+  Da bryter alle tidsbestemte påminnelser gjennom Fokus automatisk. Snarveien trenger
+  ingen per-sak-logikk for dette.
+- Begrensning (dokumentert, ikke en bug): iOS 26.2 «Viktig»-alarm (gjennombrudd også ved
+  lydløs) kan **ikke** settes fra snarvei/Siri per okt 2026 — må ev. hukes av manuelt
+  per påminnelse. Utenfor scope.
 
 ## Cache / versjon
 - `sw.js` `VERSION` → `'7'`; `index.html` `APP_VERSION` → `'7'`.
@@ -115,7 +133,8 @@ Snarvei `TorGunnar` som:
 - `noteItems`: kun notater, nyeste først.
 - `scheduleTask`: setter remindAt + due (dato), beholder/​setter type task.
 - `markPushedToIos`: setter iosPushedAt.
-- `buildShortcutUrl`: riktig URL + url-enkodet JSON med title/due.
+- `buildShortcutUrl`: `input=text` + egen `text`-param, url-enkodet JSON med title/due,
+  riktig `name`-enkoding.
 - Fang med default type task (via app-lag dekkes manuelt; logikk: addItem type task).
 
 ## Avgrensning (YAGNI)
