@@ -6,6 +6,7 @@ const App = {
   cap: { text: '', type: 'task', insistence: 'chill', cadenceDays: 7 },
   capFixed: null, capStay: false,
   edit: null,
+  timeEdit: null,
 };
 
 function ctx() { return { now: nowIso(), id: newId() }; }
@@ -140,7 +141,15 @@ function bind(root) {
   root.querySelectorAll('[data-kdismiss]').forEach((el) =>
     el.onclick = () => commit(L.deleteItem(App.state, { id: el.dataset.kdismiss }, ctx())));
   root.querySelectorAll('[data-settime]').forEach((el) =>
-    el.onclick = () => openTimePicker(el.dataset.settime));
+    el.onclick = () => openTime(el.dataset.settime));
+  root.querySelectorAll('[data-tstep]').forEach((el) =>
+    el.onclick = () => { const [u, a] = el.dataset.tstep.split('|'); adjustTime(u, Number(a)); });
+  root.querySelectorAll('[data-tquick]').forEach((el) =>
+    el.onclick = () => quickTime(el.dataset.tquick));
+  const tSave = root.querySelector('[data-tsave]');
+  if (tSave) tSave.onclick = saveTime;
+  const tCancel = root.querySelector('[data-tcancel]');
+  if (tCancel) tCancel.onclick = () => { App.timeEdit = null; render(); };
   root.querySelectorAll('[data-ios]').forEach((el) =>
     el.onclick = () => pushToIos(el.dataset.ios));
   const ssSave = root.querySelector('#setShortcutSave');
@@ -334,10 +343,12 @@ function taskRowHtml(it) {
         ? `<button class="mini" data-ios="${it.id}">✓ i Påminnelser · send på nytt</button>`
         : `<button class="mini" data-ios="${it.id}">⏰ Legg i Påminnelser</button>`)
     : '';
-  return `<div class="card"><div class="row">${chk}`
+  const head = `<div class="row">${chk}`
     + `<div class="rtxt ${it.done ? 'done' : ''}" data-edit="${it.id}"><div class="t">${esc(it.text)}</div>`
     + (meta.length ? `<div class="m">${esc(meta.join(' · '))}</div>` : '')
-    + `</div></div>`
+    + `</div></div>`;
+  if (isTimeEditing(it.id)) return `<div class="card">${head}${timeEditHtml()}</div>`;
+  return `<div class="card">${head}`
     + `<div class="taskacts">${timeBtn}${iosBtn}`
     + `<button class="mini" data-defer="${it.id}">Ikke nå</button></div></div>`;
 }
@@ -651,28 +662,60 @@ function openDefer(id) {
   });
 }
 
-function openTimePicker(id) {
-  const chips = DEFER_PRESETS.map((p, i) => `<span class="chip" data-tp="${i}">${p.label}</span>`).join('');
-  const html = `<div class="overlay" id="ov"><div class="sheet">`
-    + `<div class="lab">Sett tid for gjøremålet</div><div class="chips">${chips}</div>`
-    + `<div class="lab">Eller velg nøyaktig</div>`
-    + `<input class="inp" type="datetime-local" id="timeExact">`
-    + `<button class="btn" id="timeSet">Sett tid</button>`
-    + `<button class="btn ghost" id="timeCancel">Avbryt</button></div></div>`;
-  document.getElementById('app').insertAdjacentHTML('beforeend', html);
-  const o = document.getElementById('ov');
-  o.querySelector('#timeCancel').onclick = () => o.remove();
-  o.querySelectorAll('[data-tp]').forEach((el) => el.onclick = () => {
-    const p = DEFER_PRESETS[Number(el.dataset.tp)];
-    o.remove();
-    commit(L.scheduleTask(App.state, { id, at: deferTarget(p) }, ctx()));
-  });
-  o.querySelector('#timeSet').onclick = () => {
-    const v = o.querySelector('#timeExact').value;
-    o.remove();
-    if (!v) return;
-    commit(L.scheduleTask(App.state, { id, at: new Date(v).toISOString() }, ctx()));
-  };
+// --- Inline tid-velger med +/- steppere (build 12) ---
+function roundedNowIso() {
+  const d = new Date();
+  d.setSeconds(0, 0);
+  const add = (5 - (d.getMinutes() % 5)) % 5;
+  d.setMinutes(d.getMinutes() + add);
+  return d.toISOString();
+}
+function isTimeEditing(id) { return App.timeEdit && App.timeEdit.id === id; }
+function openTime(id) {
+  const it = App.state.items.find((i) => i.id === id);
+  App.timeEdit = { id, at: (it && it.remindAt) || roundedNowIso() };
+  render();
+}
+function adjustTime(unit, amount) {
+  const d = new Date(App.timeEdit.at);
+  if (unit === 'min') d.setMinutes(d.getMinutes() + amount);
+  else if (unit === 'hour') d.setHours(d.getHours() + amount);
+  else if (unit === 'day') d.setDate(d.getDate() + amount);
+  App.timeEdit.at = d.toISOString();
+  render();
+}
+function quickTime(kind) {
+  const d = new Date();
+  if (kind === 'kveld') { d.setHours(20, 0, 0, 0); if (d.getTime() < Date.now()) d.setDate(d.getDate() + 1); }
+  else if (kind === 'morgen') { d.setDate(d.getDate() + 1); d.setHours(8, 0, 0, 0); }
+  App.timeEdit.at = d.toISOString();
+  render();
+}
+function saveTime() {
+  const { id, at } = App.timeEdit;
+  App.timeEdit = null;
+  commit(L.scheduleTask(App.state, { id, at }, ctx()));
+}
+function stepRow(label, unit, step) {
+  return `<div class="steprow"><span class="slab">${label}</span>`
+    + `<button class="step" data-tstep="${unit}|-${step}">−</button>`
+    + `<button class="step" data-tstep="${unit}|${step}">+</button></div>`;
+}
+function timeEditHtml() {
+  const d = new Date(App.timeEdit.at);
+  const clock = pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  const date = pad2(d.getDate()) + '.' + pad2(d.getMonth() + 1) + '.' + d.getFullYear();
+  return `<div class="timeedit">`
+    + `<div class="tdisp"><span class="tclock">${clock}</span><span class="tdate">${date}</span></div>`
+    + stepRow('Minutter', 'min', 5)
+    + stepRow('Timer', 'hour', 1)
+    + stepRow('Dager', 'day', 1)
+    + `<div class="timequick">`
+    + `<button class="mini" data-tquick="kveld">I kveld</button>`
+    + `<button class="mini" data-tquick="morgen">I morgen</button></div>`
+    + `<div class="timeacts"><button class="btn" data-tsave="1">Sett tid</button>`
+    + `<button class="mini" data-tcancel="1">Avbryt</button></div>`
+    + `</div>`;
 }
 
 function pad2(n) { return String(n).padStart(2, '0'); }

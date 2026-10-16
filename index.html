@@ -89,6 +89,21 @@
   textarea.inp{resize:vertical;min-height:64px;font-family:inherit;line-height:1.4}
   .taskacts{display:flex;flex-wrap:wrap;gap:6px;padding:2px 2px 12px}
   .taskacts .mini{margin:0}
+  .timeedit{padding:4px 2px 14px}
+  .tdisp{display:flex;align-items:baseline;gap:12px;justify-content:center;
+    background:var(--surface2);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
+  .tdisp .tclock{font-size:32px;font-weight:800;letter-spacing:.02em}
+  .tdisp .tdate{font-size:15px;color:var(--dim)}
+  .steprow{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .steprow .slab{flex:1;font-size:15px}
+  .step{width:52px;height:46px;border-radius:12px;border:1px solid var(--line);
+    background:var(--surface2);color:var(--ink);font-size:24px;font-weight:700;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+  .step:active{background:var(--bamboo);color:#06220d}
+  .timequick{display:flex;gap:8px;margin:10px 0 2px}
+  .timeacts{display:flex;gap:8px;align-items:center;margin-top:12px}
+  .timeacts .btn{margin-top:0;flex:1}
+  .timeacts .mini{margin:0}
   .capture{padding:12px 14px 14px;margin-bottom:16px}
   .capture .inp{margin-bottom:0}
   .capture .lab{margin:12px 2px 8px}
@@ -118,7 +133,7 @@
 <footer class="build" id="build"></footer>
 <script>window.EDGE_FUNCTION_URL = '';</script>
 <script type="module">
-  window.APP_VERSION = '11';
+  window.APP_VERSION = '12';
   window.APP_BUILD = '2026-10-16';
   const b = document.getElementById('build');
   if (b) b.textContent = 'build ' + window.APP_VERSION + ' · ' + window.APP_BUILD;
