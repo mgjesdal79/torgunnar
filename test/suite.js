@@ -1,5 +1,5 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance } from '../js/logic.js';
-const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate };
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge } from '../js/logic.js';
+const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge };
 
 export function runTests() {
   const results = [];
@@ -405,6 +405,26 @@ export function runTests() {
     let s = wokenInst();
     s = L.skipRoutineInstance(s, { instanceId: 'r1:2026-10-16' }, { now: 'N3' });
     eq(s.routineInstances[0].skipped, true);
+  });
+
+  // ---- Mellomlang liste («På et tidspunkt») ----
+  function somedayState() {
+    let s = defaultState();
+    s = addItem(s, { text: 'Støvler', type: 'someday' }, { now: '2026-10-16T08:00:00.000Z', id: 'm1' });
+    return s;
+  }
+  t('setInsistence nudge setter cadence + resurfaceAt', () => {
+    let s = somedayState();
+    s = L.setInsistence(s, { id: 'm1', insistence: 'nudge', cadenceDays: 7 }, { now: '2026-10-16T08:00:00.000Z' });
+    const it = s.items[0];
+    eq(it.insistence, 'nudge'); eq(it.cadenceDays, 7);
+    eq(it.resurfaceAt, '2026-10-23T08:00:00.000Z');
+  });
+  t('setInsistence chill nullstiller cadence/resurfaceAt', () => {
+    let s = somedayState();
+    s = L.setInsistence(s, { id: 'm1', insistence: 'nudge', cadenceDays: 7 }, { now: '2026-10-16T08:00:00.000Z' });
+    s = L.setInsistence(s, { id: 'm1', insistence: 'chill' }, { now: '2026-10-16T08:00:00.000Z' });
+    eq(s.items[0].cadenceDays, null); eq(s.items[0].resurfaceAt, null);
   });
 
   return results;

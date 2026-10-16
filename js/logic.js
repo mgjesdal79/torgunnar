@@ -49,6 +49,7 @@ export function addItem(state, { text, type = null, category = null }, ctx) {
     due: null, remindAt: null,
     resurfaceAt: null, deferred: false, iosPushedAt: null,
     source: null, routineId: null, routineDate: null, subtasks: null,
+    insistence: null, cadenceDays: null,
     createdAt: ctx.now, updatedAt: ctx.now, removed: false,
   };
   out.items.push(item);
@@ -393,3 +394,23 @@ export function skipRoutineInstance(state, { instanceId }, ctx) {
   inst.skipped = true; inst.updatedAt = ctx.now;
   return out;
 }
+
+// ---- Mellomlang liste: «På et tidspunkt» (someday med insistence) ----
+export function setInsistence(state, { id, insistence, cadenceDays }, ctx) {
+  return patchItem(state, id, (it) => {
+    it.insistence = insistence;
+    if (insistence === 'nudge') {
+      it.cadenceDays = cadenceDays || 7;
+      it.resurfaceAt = addMinutesIso(ctx.now, it.cadenceDays * 1440);
+    } else {
+      it.cadenceDays = null;
+      it.resurfaceAt = null;
+    }
+  }, ctx);
+}
+
+export function nudgeDue(item, now) { return false; }
+export function snoozeNudge(state, payload, ctx) { return state; }
+export function promoteToToday(state, payload, ctx) { return state; }
+export function mediumItems(state) { return []; }
+export function mediumBadge(state) { return { count: 0, level: 'calm' }; }
