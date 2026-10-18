@@ -555,14 +555,19 @@ function renderRoutines() {
   const todayInst = L.routineInstancesForDate(App.state, today);
   const tomInst = L.routineInstancesForDate(App.state, tomorrow);
   const sleeping = L.sleepingRoutines(App.state);
-  const all = App.state.settings.routines.slice();
+  // Rutiner som allerede vises over (I dag / For i morgen / Sovende) – unngå duplikater.
+  const shown = new Set();
+  todayInst.forEach((i) => shown.add(i.routineId));
+  tomInst.forEach((i) => shown.add(i.routineId));
+  sleeping.forEach((r) => shown.add(r.id));
+  const others = App.state.settings.routines.filter((r) => !shown.has(r.id));
   return headerBar('🔁 Rutiner')
     + `<div class="body">`
     + `<p class="sub">Dine rutiner maser ikke – du henter dem når du vil.</p>`
     + `<h2>I dag</h2>` + (todayInst.length ? todayInst.map(instCardHtml).join('') : `<p class="sub">Ingen aktive i dag.</p>`)
     + (tomInst.length ? `<h2>For i morgen 🌙</h2>` + tomInst.map(instCardHtml).join('') : '')
     + `<h2>Sovende</h2>` + (sleeping.length ? `<div class="card">${sleeping.map(sleepRowHtml).join('')}</div>` : `<p class="sub">Ingen sovende rutiner.</p>`)
-    + `<h2>Alle rutiner</h2>` + (all.length ? `<div class="card">${all.map(tmplRowHtml).join('')}</div>` : `<p class="sub">Ingen ennå.</p>`)
+    + (others.length ? `<h2>Andre rutiner</h2><div class="card">${others.map(tmplRowHtml).join('')}</div>` : '')
     + `<button class="btn" data-rnew="1">＋ Ny rutine</button>`
     + `</div>`;
 }
