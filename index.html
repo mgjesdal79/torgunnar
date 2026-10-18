@@ -72,7 +72,9 @@
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;
     justify-content:center;z-index:50}
   .sheet{background:var(--surface);border:1px solid var(--line);border-radius:22px 22px 0 0;
-    padding:18px 16px calc(18px + env(safe-area-inset-bottom));width:100%;max-width:520px}
+    padding:18px 16px calc(18px + env(safe-area-inset-bottom));width:100%;max-width:520px;
+    max-height:calc(100dvh - env(safe-area-inset-top) - 16px);overflow-y:auto;
+    overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   .inp{width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:14px;
     color:var(--ink);padding:14px;font-size:16px;margin-bottom:6px}
   .lab{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);margin:16px 2px 8px}
@@ -133,8 +135,8 @@
 <footer class="build" id="build"></footer>
 <script>window.EDGE_FUNCTION_URL = '';</script>
 <script type="module">
-  window.APP_VERSION = '14';
-  window.APP_BUILD = '2026-10-16';
+  window.APP_VERSION = '15';
+  window.APP_BUILD = '2026-10-18';
   const b = document.getElementById('build');
   if (b) b.textContent = 'build ' + window.APP_VERSION + ' · ' + window.APP_BUILD;
   import('./js/app.js?cb=' + window.APP_VERSION);
