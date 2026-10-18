@@ -67,6 +67,7 @@
   .rtxt.done .t{text-decoration:line-through;color:var(--faint)}
   .mini{background:none;border:1px solid var(--line);color:var(--dim);border-radius:999px;
     padding:6px 11px;font-size:13px;cursor:pointer}
+  .mini.on{background:var(--bamboo);border-color:var(--bamboo);color:#06220d}
   .typ{font-size:11px;padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}
   .back{background:none;border:none;color:var(--bamboo);font-size:15px;padding:8px 2px;cursor:pointer}
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;
@@ -135,7 +136,7 @@
 <footer class="build" id="build"></footer>
 <script>window.EDGE_FUNCTION_URL = '';</script>
 <script type="module">
-  window.APP_VERSION = '15';
+  window.APP_VERSION = '16';
   window.APP_BUILD = '2026-10-18';
   const b = document.getElementById('build');
   if (b) b.textContent = 'build ' + window.APP_VERSION + ' · ' + window.APP_BUILD;

@@ -49,7 +49,7 @@ function renderHome() {
     + tileHtml('✅', 'Gjøremål', { count: taskN, level: taskN ? 'open' : 'calm' }, 'data-view="tasks"')
     + tileHtml('💼', 'Jobb', { count: jobN, level: jobN ? 'open' : 'calm' }, 'data-view="job"')
     + tileHtml('💛', 'Langsiktig', mediumN, 'data-view="medium"')
-    + tileHtml('📝', 'Notater', null, 'data-view="notes"')
+    + tileHtml('📝', 'Notater', L.noteBadge(App.state), 'data-view="notes"')
     + tileHtml('💬', 'Ingrid', konaN, 'data-view="kona"')
     + tileHtml('🔁', 'Rutiner', null, 'data-view="routines"')
     + tileHtml('⚙️', 'Innstillinger', null, 'data-view="settings"');
@@ -124,6 +124,8 @@ function bind(root) {
     el.onclick = () => commit(L.undeferItem(App.state, { id: el.dataset.undefer }, ctx())));
   root.querySelectorAll('[data-edit]').forEach((el) =>
     el.onclick = () => openEdit(el.dataset.edit));
+  root.querySelectorAll('[data-notebadge]').forEach((el) =>
+    el.onclick = () => commit(L.toggleNoteBadge(App.state, { id: el.dataset.notebadge }, ctx())));
   root.querySelectorAll('[data-rtoggle]').forEach((el) =>
     el.onclick = () => { const id = el.dataset.rtoggle; App.rOpen[id] = !App.rOpen[id]; render(); });
   root.querySelectorAll('[data-rsub]').forEach((el) =>
@@ -410,8 +412,12 @@ function renderJob() {
 
 function noteRowHtml(it) {
   if (isEditing(it.id)) return editForm();
+  const on = !!it.badge;
   return `<div class="row">`
     + `<div class="rtxt" data-edit="${it.id}"><div class="t">${esc(it.text)}</div></div>`
+    + `<button class="mini ${on ? 'on' : ''}" data-notebadge="${it.id}" `
+    + `title="${on ? 'Teller på badge – trykk for å bare la den ligge' : 'Bare ligger – trykk for å telle på badge'}">`
+    + `${on ? '🔔' : '🔕'}</button>`
     + `<button class="mini" data-edit="${it.id}">Rediger</button></div>`;
 }
 
