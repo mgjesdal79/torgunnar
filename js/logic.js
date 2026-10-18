@@ -237,6 +237,17 @@ export function noteItems(state) {
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 }
 
+// Notat-badge: notater ligger passivt som standard. De som må gjøres om til en
+// aksjon slås på med toggleNoteBadge og telles her (forsidens 📝-badge).
+export function noteBadge(state) {
+  const count = noteItems(state).filter((i) => i.badge).length;
+  return { count, level: count ? 'open' : 'calm' };
+}
+
+export function toggleNoteBadge(state, { id }, ctx) {
+  return patchItem(state, id, (it) => { it.badge = !it.badge; }, ctx);
+}
+
 function bumpSettings(out, ctx) { out.settings.updatedAt = ctx.now; }
 
 export function setShortcutName(state, { name }, ctx) {

@@ -1,5 +1,5 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, jobItems, deferredJobItems, noteItems, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes } from '../js/logic.js';
-const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge, taskItems, jobItems, deferredJobItems, noteItems, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes };
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, jobItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes } from '../js/logic.js';
+const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge, taskItems, jobItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes };
 
 export function runTests() {
   const results = [];
@@ -617,6 +617,37 @@ export function runTests() {
     s = addItem(s, { text: 'n2', type: 'note' }, { now: '2026-10-16T09:00:00.000Z', id: 'b' });
     s = addItem(s, { text: 'task', type: 'task' }, { now: '2026-10-16T10:00:00.000Z', id: 'c' });
     eq(L.noteItems(s).map((i) => i.id), ['b', 'a']);
+  });
+  t('noteBadge: nye notater teller ikke som standard (bare ligge)', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'n1', type: 'note' }, { now: 'N', id: 'a' });
+    s = addItem(s, { text: 'n2', type: 'note' }, { now: 'N', id: 'b' });
+    eq(L.noteBadge(s), { count: 0, level: 'calm' });
+  });
+  t('noteBadge: teller kun notater som er slått på', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'n1', type: 'note' }, { now: 'N', id: 'a' });
+    s = addItem(s, { text: 'n2', type: 'note' }, { now: 'N', id: 'b' });
+    s = addItem(s, { text: 'n3', type: 'note' }, { now: 'N', id: 'c' });
+    s = L.toggleNoteBadge(s, { id: 'a' }, { now: 'N2' });
+    s = L.toggleNoteBadge(s, { id: 'b' }, { now: 'N2' });
+    eq(L.noteBadge(s), { count: 2, level: 'open' });
+  });
+  t('toggleNoteBadge: slår av og på, bumper updatedAt', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'n1', type: 'note' }, { now: 'N', id: 'a' });
+    s = L.toggleNoteBadge(s, { id: 'a' }, { now: 'N2' });
+    eq(s.items[0].badge, true);
+    eq(s.items[0].updatedAt, 'N2');
+    s = L.toggleNoteBadge(s, { id: 'a' }, { now: 'N3' });
+    eq(s.items[0].badge, false);
+  });
+  t('noteBadge: ser bort fra slettede notater', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'n1', type: 'note' }, { now: 'N', id: 'a' });
+    s = L.toggleNoteBadge(s, { id: 'a' }, { now: 'N2' });
+    s = deleteItem(s, { id: 'a' }, { now: 'N3' });
+    eq(L.noteBadge(s), { count: 0, level: 'calm' });
   });
   t('scheduleTask setter remindAt + due (dato), type task, nullstiller ios', () => {
     let s = defaultState();
