@@ -134,10 +134,13 @@
 <body>
 <div id="app"></div>
 <footer class="build" id="build"></footer>
-<script>window.EDGE_FUNCTION_URL = '';</script>
+<script>
+  window.EDGE_FUNCTION_URL = 'https://vkhktataxypuobrzslbi.supabase.co/functions/v1/torgunnar';
+  window.SUPABASE_ANON_KEY = 'sb_publishable_iUwAfMrw1Ckrxbf1ZDLINA_xKUGyscg'; // publishable (public-safe)
+</script>
 <script type="module">
-  window.APP_VERSION = '16';
-  window.APP_BUILD = '2026-10-18';
+  window.APP_VERSION = '17';
+  window.APP_BUILD = '2026-10-21';
   const b = document.getElementById('build');
   if (b) b.textContent = 'build ' + window.APP_VERSION + ' · ' + window.APP_BUILD;
   import('./js/app.js?cb=' + window.APP_VERSION);
