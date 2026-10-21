@@ -1,5 +1,5 @@
 import * as L from './logic.js';
-import { loadState, saveStateDebounced, nowIso, todayIso, newId } from './store.js';
+import { loadState, saveStateDebounced, startPolling, nowIso, todayIso, newId } from './store.js';
 
 const App = {
   view: 'home', catId: null, state: null, rOpen: {}, routineEdit: null,
@@ -788,8 +788,22 @@ function pushToIos(id) {
   commit(L.markPushedToIos(App.state, { id }, ctx()));
 }
 
-App.state = loadState();
-App.state = syncRoutines(App.state);
-saveStateDebounced(App.state);
-render();
+async function init() {
+  App.state = await loadState();          // lokal cache + delt sky, flettet
+  App.state = syncRoutines(App.state);
+  saveStateDebounced(App.state);
+  render();
+  // Hent inn endringer fra andre enheter hvert 5. sekund; tegn kun om ved faktisk nytt.
+  startPolling(
+    () => App.state,
+    (merged) => {
+      // Hold in-memory state fersk (ellers kan neste lagring overskrive sky-endringen),
+      // men IKKE tegn om midt i aktiv redigering/fangst – det stjeler fokus/mister tekst.
+      App.state = merged;
+      if (App.edit || App.routineEdit || App.timeEdit || (App.cap && App.cap.text)) return;
+      render();
+    },
+  );
+}
+init();
 window.App = App; // for feilsøking i konsollen
