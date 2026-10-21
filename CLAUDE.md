@@ -61,3 +61,26 @@ annen, filer forsvinner når noen bytter branch, og build-nummer kolliderer (set
 ### Test
 `/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc -m test/run-jsc.js`
 (ren logikk i `js/logic.js` er testet; `js/app.js` = UI, ikke testet). Må være grønn før PR.
+
+## Delt sky-synk (Supabase) + CORS-fella (lært 21.10.2026)
+
+Appen synker all state via en delt Supabase-backend (prosjekt `vkhktataxypuobrzslbi`, samme
+som Honniscoins). Edge Function `torgunnar` + tabell `torgunnar_rooms`. Se `supabase/README.md`
+for kontrakt og oppsett. Frontend: `js/store.js` (lokal cache + remote, LWW-fletting, 5s polling).
+
+### Tilgang: romkode (ikke i repoet!)
+Fra build 18 er appen låst bak en **felles romkode** som utleder rommet
+(`room = 'tgc-' + normalisert kode`). Koden er den EKTE nøkkelen, ligger kun lokalt
+(`localStorage['torgunnar:code']`) – **ALDRI commit koden** (repoet er public). Selve koden
+står i Martins private globale `~/.claude/CLAUDE.md`.
+
+### CORS-fella (kostet en hel feilsøkingsrunde – synk feilet STILLE)
+Edge Function-ens `Access-Control-Allow-Headers` **MÅ** inkludere `authorization` og `apikey`,
+ikke bare `content-type`. Nettleseren sender alle tre på hvert kall (apikey + Bearer kreves av
+Supabase-gatewayen selv med «Verify JWT» OFF). Mangler de i allow-lista, blokkerer nettleseren
+kallet i CORS-preflight → `fetch` kaster → `store.js` svelger feilen stille → appen faller
+tilbake på ren localStorage (hver enhet viser bare sitt eget). curl/serveren ser «grønt» ut
+fordi curl ignorerer CORS – bare nettleseren håndhever det. Riktig linje:
+`'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info'`.
+Funksjonskoden lever kun i Supabase-dashbordet (pipelock nekter å skrive creds+endpoint til fil),
+så denne fiksen gjøres i dashbordet → Edit → Deploy, ikke i repoet.
