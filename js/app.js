@@ -1,5 +1,6 @@
 import * as L from './logic.js';
-import { loadState, saveStateDebounced, startPolling, nowIso, todayIso, newId } from './store.js';
+import { loadState, saveStateDebounced, startPolling, nowIso, todayIso, newId,
+         hasCode, setCode, clearCode } from './store.js';
 
 const App = {
   view: 'home', catId: null, state: null, rOpen: {}, routineEdit: null,
@@ -171,6 +172,8 @@ function bind(root) {
   };
   const qReset = root.querySelector('#setQuotesReset');
   if (qReset) qReset.onclick = () => commit(L.setQuotes(App.state, { text: '' }, ctx()));
+  const lk = root.querySelector('#setLock');
+  if (lk) lk.onclick = lockApp;
   const konaAdd = root.querySelector('#konaAdd');
   if (konaAdd) {
     const inp = root.querySelector('#konaText');
@@ -676,6 +679,9 @@ function renderSettings() {
     + `<textarea class="inp" id="setQuotes" rows="8">${esc((App.state.settings.quotes || []).join('\n'))}</textarea>`
     + `<button class="btn" id="setQuotesSave">Lagre sitater</button>`
     + `<button class="btn ghost" id="setQuotesReset">Tilbakestill til standard</button>`
+    + `<h2>Romkode</h2>`
+    + `<p class="sub">Appen er låst med en felles romkode. Lås denne enheten – eller bytt til en ny kode – her. (Dine notater i skya påvirkes ikke.)</p>`
+    + `<button class="btn ghost" id="setLock">Lås / bytt romkode</button>`
     + `</div>`;
 }
 
@@ -788,7 +794,40 @@ function pushToIos(id) {
   commit(L.markPushedToIos(App.state, { id }, ctx()));
 }
 
+// Låseskjerm: uten romkode viser vi ingenting av innholdet. Koden er den ekte
+// nøkkelen til de delte dataene – den lagres kun lokalt på enheten.
+function renderLock(err) {
+  const root = document.getElementById('app');
+  root.innerHTML = `<div class="banner"><div class="b">🦸‍♂️ Tor Gunnar</div></div>`
+    + `<div class="body">`
+    + `<div class="capture card">`
+    + `<div class="lab">Romkode</div>`
+    + `<p class="sub">Skriv inn koden for å åpne de delte notatene. Du taster den bare én gang per enhet.</p>`
+    + `<input class="inp" id="codeInput" placeholder="xxxx-xxxx-xxxx" `
+    + `autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text">`
+    + `<button class="btn" id="codeBtn">Lås opp</button>`
+    + (err ? `<p class="sub" style="color:var(--rose);margin-top:10px">${esc(err)}</p>` : '')
+    + `</div></div>`;
+  const inp = root.querySelector('#codeInput');
+  const go = () => {
+    const code = (inp.value || '').trim();
+    if (!code) { renderLock('Skriv inn koden.'); return; }
+    setCode(code);
+    init();
+  };
+  root.querySelector('#codeBtn').onclick = go;
+  inp.onkeydown = (ev) => { if (ev.key === 'Enter') go(); };
+  inp.focus();
+}
+
+function lockApp() {
+  clearCode();
+  App.state = null; App.view = 'home';
+  renderLock();
+}
+
 async function init() {
+  if (!hasCode()) { renderLock(); return; }
   App.state = await loadState();          // lokal cache + delt sky, flettet
   App.state = syncRoutines(App.state);
   saveStateDebounced(App.state);
