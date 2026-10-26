@@ -46,6 +46,7 @@ function renderHome() {
   const jobN = L.jobItems(App.state, now).length;
   const mediumN = L.mediumBadge(App.state);
   const konaN = L.konaBadge(App.state);
+  const trashN = L.trashItems(App.state).length;
   const tiles = tileHtml('📥', 'Innboks', { count: inboxN, level: inboxN ? 'hot' : 'calm' }, 'data-view="inbox"')
     + tileHtml('✅', 'Gjøremål', { count: taskN, level: taskN ? 'open' : 'calm' }, 'data-view="tasks"')
     + tileHtml('💼', 'Jobb', { count: jobN, level: jobN ? 'open' : 'calm' }, 'data-view="job"')
@@ -53,7 +54,8 @@ function renderHome() {
     + tileHtml('📝', 'Notater', L.noteBadge(App.state), 'data-view="notes"')
     + tileHtml('💬', 'Ingrid', konaN, 'data-view="kona"')
     + tileHtml('🔁', 'Rutiner', null, 'data-view="routines"')
-    + tileHtml('⚙️', 'Innstillinger', null, 'data-view="settings"');
+    + tileHtml('⚙️', 'Innstillinger', null, 'data-view="settings"')
+    + tileHtml('🗑', 'Søppelkasse', { count: trashN, level: trashN ? 'open' : 'calm' }, 'data-view="trash"');
   const todaySection = `<h2 class="todayhead" data-view="today">📌 I dag</h2>`
     + (todayItems.length
         ? listCard(todayItems)
@@ -78,6 +80,7 @@ function render() {
   else if (v === 'kona') root.innerHTML = renderKona();
   else if (v === 'routines') root.innerHTML = renderRoutines();
   else if (v === 'settings') root.innerHTML = renderSettings();
+  else if (v === 'trash') root.innerHTML = renderTrash();
   else root.innerHTML = renderHome();
   bind(root);
 }
@@ -123,6 +126,14 @@ function bind(root) {
     el.onclick = () => openDefer(el.dataset.defer));
   root.querySelectorAll('[data-undefer]').forEach((el) =>
     el.onclick = () => commit(L.undeferItem(App.state, { id: el.dataset.undefer }, ctx())));
+  root.querySelectorAll('[data-restore]').forEach((el) =>
+    el.onclick = () => commit(L.restoreItem(App.state, { id: el.dataset.restore }, ctx())));
+  root.querySelectorAll('[data-purge]').forEach((el) =>
+    el.onclick = () => {
+      if (confirm('Slette denne for godt? Dette kan ikke angres.')) {
+        commit(L.purgeItem(App.state, { id: el.dataset.purge }, ctx()));
+      }
+    });
   root.querySelectorAll('[data-edit]').forEach((el) =>
     el.onclick = () => openEdit(el.dataset.edit));
   root.querySelectorAll('[data-notebadge]').forEach((el) =>
@@ -422,6 +433,28 @@ function noteRowHtml(it) {
     + `title="${on ? 'Teller på badge – trykk for å bare la den ligge' : 'Bare ligger – trykk for å telle på badge'}">`
     + `${on ? '🔔' : '🔕'}</button>`
     + `<button class="mini" data-edit="${it.id}">Rediger</button></div>`;
+}
+
+function trashRowHtml(it) {
+  const when = it.removedAt ? fmtDateTime(it.removedAt) : 'nylig';
+  const typeLabel = { note: 'Notat', task: 'Gjøremål', job: 'Jobb', reminder: 'Påminnelse', someday: 'Langsiktig' }[it.type];
+  const meta = '🗑 slettet ' + when + (typeLabel ? ' · ' + typeLabel : '');
+  return `<div class="row">`
+    + `<div class="rtxt"><div class="t">${esc(it.text || '(tom)')}</div>`
+    + `<div class="m">${esc(meta)}</div></div>`
+    + `<button class="mini" data-restore="${it.id}">Gjenopprett</button>`
+    + `<button class="mini danger" data-purge="${it.id}">Slett for godt</button></div>`;
+}
+
+function renderTrash() {
+  const items = L.trashItems(App.state);
+  const list = items.length
+    ? `<div class="card">${items.map(trashRowHtml).join('')}</div>`
+    : `<p class="sub">Søppelkassa er tom 🌱</p>`;
+  return headerBar('🗑 Søppelkasse')
+    + `<div class="body">`
+    + `<p class="sub">Slettede ting ligger her i 30 dager, så kan du angre. Etter det forsvinner de for godt.</p>`
+    + list + `</div>`;
 }
 
 function renderNotes() {
@@ -830,6 +863,7 @@ async function init() {
   if (!hasCode()) { renderLock(); return; }
   App.state = await loadState();          // lokal cache + delt sky, flettet
   App.state = syncRoutines(App.state);
+  App.state = L.expireTrash(App.state, nowIso());  // tøm søppel eldre enn 30 dager
   saveStateDebounced(App.state);
   render();
   // Hent inn endringer fra andre enheter hvert 5. sekund; tegn kun om ved faktisk nytt.
