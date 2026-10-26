@@ -134,6 +134,13 @@ function bind(root) {
         commit(L.purgeItem(App.state, { id: el.dataset.purge }, ctx()));
       }
     });
+  const purgeAll = root.querySelector('[data-purgeall]');
+  if (purgeAll) purgeAll.onclick = () => {
+    const n = L.trashItems(App.state).length;
+    if (confirm('Tømme hele søppelkassa (' + n + ')? Dette kan ikke angres.')) {
+      commit(L.purgeAllTrash(App.state, ctx()));
+    }
+  };
   root.querySelectorAll('[data-edit]').forEach((el) =>
     el.onclick = () => openEdit(el.dataset.edit));
   root.querySelectorAll('[data-notebadge]').forEach((el) =>
@@ -451,10 +458,13 @@ function renderTrash() {
   const list = items.length
     ? `<div class="card">${items.map(trashRowHtml).join('')}</div>`
     : `<p class="sub">Søppelkassa er tom 🌱</p>`;
+  const emptyBtn = items.length
+    ? `<button class="btn ghost" data-purgeall="1">Tøm søppelkassa (${items.length})</button>`
+    : '';
   return headerBar('🗑 Søppelkasse')
     + `<div class="body">`
-    + `<p class="sub">Slettede ting ligger her i 30 dager, så kan du angre. Etter det forsvinner de for godt.</p>`
-    + list + `</div>`;
+    + `<p class="sub">Slettede ting blir liggende her til du tømmer selv. Gjenopprett det du vil ha tilbake.</p>`
+    + list + emptyBtn + `</div>`;
 }
 
 function renderNotes() {
@@ -863,7 +873,6 @@ async function init() {
   if (!hasCode()) { renderLock(); return; }
   App.state = await loadState();          // lokal cache + delt sky, flettet
   App.state = syncRoutines(App.state);
-  App.state = L.expireTrash(App.state, nowIso());  // tøm søppel eldre enn 30 dager
   saveStateDebounced(App.state);
   render();
   // Hent inn endringer fra andre enheter hvert 5. sekund; tegn kun om ved faktisk nytt.

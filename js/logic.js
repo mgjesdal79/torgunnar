@@ -147,8 +147,18 @@ export function purgeItem(state, { id }, ctx) {
   }, ctx);
 }
 
-// Rydder søppelkassa automatisk: tomt for godt etter `days` dager. Udaterte
-// gamle slettinger får et removedAt nå (klokka starter ved første oppstart).
+// Tømmer hele søppelkassa manuelt (alle i trash → tombstone).
+export function purgeAllTrash(state, ctx) {
+  let out = state;
+  for (const it of trashItems(state)) {
+    out = purgeItem(out, { id: it.id }, ctx);
+  }
+  return out;
+}
+
+// (Valgfri) rydder søppelkassa automatisk etter `days` dager. Kjøres IKKE
+// automatisk nå – Martin tømmer manuelt via badge-nudge. Beholdt om vi vil
+// slå den på senere. Udaterte gamle slettinger får removedAt ved kjøring.
 export function expireTrash(state, now, days = 30) {
   const cutoff = addMinutesIso(now, -days * 1440);
   let changed = false;

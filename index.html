@@ -103,6 +103,8 @@
     background:var(--surface2);color:var(--ink);font-size:24px;font-weight:700;cursor:pointer;
     display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
   .step:active{background:var(--bamboo);color:#06220d}
+  /* Hindrer at raske trykk tolkes som dobbelttrykk-for-zoom på iOS */
+  .step,.mini,.btn,.chip,.tile{touch-action:manipulation}
   .timequick{display:flex;gap:8px;margin:10px 0 2px}
   .timeacts{display:flex;gap:8px;align-items:center;margin-top:12px}
   .timeacts .btn{margin-top:0;flex:1}
