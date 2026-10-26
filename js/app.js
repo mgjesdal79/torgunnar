@@ -811,6 +811,11 @@ function timeEditHtml() {
   const date = pad2(d.getDate()) + '.' + pad2(d.getMonth() + 1) + '.' + d.getFullYear();
   return `<div class="timeedit">`
     + `<div class="tdisp"><span class="tclock">${clock}</span><span class="tdate">${date}</span></div>`
+    + `<div class="timepush">`
+    + `<button class="mini" data-tstep="hour|1">+1 t</button>`
+    + `<button class="mini" data-tstep="hour|3">+3 t</button>`
+    + `<button class="mini" data-tstep="day|1">+1 dag</button>`
+    + `<button class="mini" data-tstep="day|7">+1 uke</button></div>`
     + stepRow('Minutter', 'min', 5)
     + stepRow('Timer', 'hour', 1)
     + stepRow('Dager', 'day', 1)
