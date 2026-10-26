@@ -123,9 +123,54 @@ export function reopenItem(state, { id }, ctx) {
 }
 
 export function deleteItem(state, { id }, ctx) {
-  const out = patchItem(state, id, (it) => { it.removed = true; }, ctx);
+  const out = patchItem(state, id, (it) => { it.removed = true; it.removedAt = ctx.now; }, ctx);
   if (out !== state) pushLog(out, { id: id + ':del:' + ctx.now, type: 'item', action: 'delete', itemId: id, at: ctx.now });
   return out;
+}
+
+// Søppelkasse: slettet (removed) men ikke tømt for godt (purged). Nyeste først.
+export function trashItems(state) {
+  return (state.items || [])
+    .filter((i) => i.removed && !i.purged)
+    .sort((a, b) => (b.removedAt || '').localeCompare(a.removedAt || ''));
+}
+
+export function restoreItem(state, { id }, ctx) {
+  return patchItem(state, id, (it) => { it.removed = false; it.removedAt = null; }, ctx);
+}
+
+// «Slett for godt» = permanent tombstone (ikke array-fjerning), ellers kan et
+// usynket apparat gjenopplive elementet via mergeState (union-per-id, LWW).
+export function purgeItem(state, { id }, ctx) {
+  return patchItem(state, id, (it) => {
+    it.removed = true; it.purged = true; it.text = ''; it.subtasks = null;
+  }, ctx);
+}
+
+// Tømmer hele søppelkassa manuelt (alle i trash → tombstone).
+export function purgeAllTrash(state, ctx) {
+  let out = state;
+  for (const it of trashItems(state)) {
+    out = purgeItem(out, { id: it.id }, ctx);
+  }
+  return out;
+}
+
+// (Valgfri) rydder søppelkassa automatisk etter `days` dager. Kjøres IKKE
+// automatisk nå – Martin tømmer manuelt via badge-nudge. Beholdt om vi vil
+// slå den på senere. Udaterte gamle slettinger får removedAt ved kjøring.
+export function expireTrash(state, now, days = 30) {
+  const cutoff = addMinutesIso(now, -days * 1440);
+  let changed = false;
+  const out = clone(state);
+  for (const it of out.items || []) {
+    if (!it.removed || it.purged) continue;
+    if (!it.removedAt) { it.removedAt = now; it.updatedAt = now; changed = true; }
+    else if (it.removedAt < cutoff) {
+      it.purged = true; it.text = ''; it.subtasks = null; it.updatedAt = now; changed = true;
+    }
+  }
+  return changed ? out : state;
 }
 
 export function deferItem(state, { id, resurfaceAt }, ctx) {

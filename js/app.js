@@ -46,6 +46,7 @@ function renderHome() {
   const jobN = L.jobItems(App.state, now).length;
   const mediumN = L.mediumBadge(App.state);
   const konaN = L.konaBadge(App.state);
+  const trashN = L.trashItems(App.state).length;
   const tiles = tileHtml('📥', 'Innboks', { count: inboxN, level: inboxN ? 'hot' : 'calm' }, 'data-view="inbox"')
     + tileHtml('✅', 'Gjøremål', { count: taskN, level: taskN ? 'open' : 'calm' }, 'data-view="tasks"')
     + tileHtml('💼', 'Jobb', { count: jobN, level: jobN ? 'open' : 'calm' }, 'data-view="job"')
@@ -53,7 +54,8 @@ function renderHome() {
     + tileHtml('📝', 'Notater', L.noteBadge(App.state), 'data-view="notes"')
     + tileHtml('💬', 'Ingrid', konaN, 'data-view="kona"')
     + tileHtml('🔁', 'Rutiner', null, 'data-view="routines"')
-    + tileHtml('⚙️', 'Innstillinger', null, 'data-view="settings"');
+    + tileHtml('⚙️', 'Innstillinger', null, 'data-view="settings"')
+    + tileHtml('🗑', 'Søppelkasse', { count: trashN, level: trashN ? 'open' : 'calm' }, 'data-view="trash"');
   const todaySection = `<h2 class="todayhead" data-view="today">📌 I dag</h2>`
     + (todayItems.length
         ? listCard(todayItems)
@@ -78,6 +80,7 @@ function render() {
   else if (v === 'kona') root.innerHTML = renderKona();
   else if (v === 'routines') root.innerHTML = renderRoutines();
   else if (v === 'settings') root.innerHTML = renderSettings();
+  else if (v === 'trash') root.innerHTML = renderTrash();
   else root.innerHTML = renderHome();
   bind(root);
 }
@@ -123,6 +126,21 @@ function bind(root) {
     el.onclick = () => openDefer(el.dataset.defer));
   root.querySelectorAll('[data-undefer]').forEach((el) =>
     el.onclick = () => commit(L.undeferItem(App.state, { id: el.dataset.undefer }, ctx())));
+  root.querySelectorAll('[data-restore]').forEach((el) =>
+    el.onclick = () => commit(L.restoreItem(App.state, { id: el.dataset.restore }, ctx())));
+  root.querySelectorAll('[data-purge]').forEach((el) =>
+    el.onclick = () => {
+      if (confirm('Slette denne for godt? Dette kan ikke angres.')) {
+        commit(L.purgeItem(App.state, { id: el.dataset.purge }, ctx()));
+      }
+    });
+  const purgeAll = root.querySelector('[data-purgeall]');
+  if (purgeAll) purgeAll.onclick = () => {
+    const n = L.trashItems(App.state).length;
+    if (confirm('Tømme hele søppelkassa (' + n + ')? Dette kan ikke angres.')) {
+      commit(L.purgeAllTrash(App.state, ctx()));
+    }
+  };
   root.querySelectorAll('[data-edit]').forEach((el) =>
     el.onclick = () => openEdit(el.dataset.edit));
   root.querySelectorAll('[data-notebadge]').forEach((el) =>
@@ -422,6 +440,31 @@ function noteRowHtml(it) {
     + `title="${on ? 'Teller på badge – trykk for å bare la den ligge' : 'Bare ligger – trykk for å telle på badge'}">`
     + `${on ? '🔔' : '🔕'}</button>`
     + `<button class="mini" data-edit="${it.id}">Rediger</button></div>`;
+}
+
+function trashRowHtml(it) {
+  const when = it.removedAt ? fmtDateTime(it.removedAt) : 'nylig';
+  const typeLabel = { note: 'Notat', task: 'Gjøremål', job: 'Jobb', reminder: 'Påminnelse', someday: 'Langsiktig' }[it.type];
+  const meta = '🗑 slettet ' + when + (typeLabel ? ' · ' + typeLabel : '');
+  return `<div class="row">`
+    + `<div class="rtxt"><div class="t">${esc(it.text || '(tom)')}</div>`
+    + `<div class="m">${esc(meta)}</div></div>`
+    + `<button class="mini" data-restore="${it.id}">Gjenopprett</button>`
+    + `<button class="mini danger" data-purge="${it.id}">Slett for godt</button></div>`;
+}
+
+function renderTrash() {
+  const items = L.trashItems(App.state);
+  const list = items.length
+    ? `<div class="card">${items.map(trashRowHtml).join('')}</div>`
+    : `<p class="sub">Søppelkassa er tom 🌱</p>`;
+  const emptyBtn = items.length
+    ? `<button class="btn ghost" data-purgeall="1">Tøm søppelkassa (${items.length})</button>`
+    : '';
+  return headerBar('🗑 Søppelkasse')
+    + `<div class="body">`
+    + `<p class="sub">Slettede ting blir liggende her til du tømmer selv. Gjenopprett det du vil ha tilbake.</p>`
+    + list + emptyBtn + `</div>`;
 }
 
 function renderNotes() {
@@ -768,6 +811,11 @@ function timeEditHtml() {
   const date = pad2(d.getDate()) + '.' + pad2(d.getMonth() + 1) + '.' + d.getFullYear();
   return `<div class="timeedit">`
     + `<div class="tdisp"><span class="tclock">${clock}</span><span class="tdate">${date}</span></div>`
+    + `<div class="timepush">`
+    + `<button class="mini" data-tstep="hour|1">+1 t</button>`
+    + `<button class="mini" data-tstep="hour|3">+3 t</button>`
+    + `<button class="mini" data-tstep="day|1">+1 dag</button>`
+    + `<button class="mini" data-tstep="day|7">+1 uke</button></div>`
     + stepRow('Minutter', 'min', 5)
     + stepRow('Timer', 'hour', 1)
     + stepRow('Dager', 'day', 1)

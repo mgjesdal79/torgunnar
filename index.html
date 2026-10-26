@@ -103,6 +103,10 @@
     background:var(--surface2);color:var(--ink);font-size:24px;font-weight:700;cursor:pointer;
     display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
   .step:active{background:var(--bamboo);color:#06220d}
+  /* Hindrer at raske trykk tolkes som dobbelttrykk-for-zoom på iOS */
+  .step,.mini,.btn,.chip,.tile{touch-action:manipulation}
+  .timepush{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+  .timepush .mini{flex:1;min-width:60px;text-align:center}
   .timequick{display:flex;gap:8px;margin:10px 0 2px}
   .timeacts{display:flex;gap:8px;align-items:center;margin-top:12px}
   .timeacts .btn{margin-top:0;flex:1}
@@ -139,8 +143,8 @@
   window.SUPABASE_ANON_KEY = 'sb_publishable_iUwAfMrw1Ckrxbf1ZDLINA_xKUGyscg'; // publishable (public-safe)
 </script>
 <script type="module">
-  window.APP_VERSION = '18';
-  window.APP_BUILD = '2026-10-21';
+  window.APP_VERSION = '19';
+  window.APP_BUILD = '2026-10-26';
   const b = document.getElementById('build');
   if (b) b.textContent = 'build ' + window.APP_VERSION + ' · ' + window.APP_BUILD;
   import('./js/app.js?cb=' + window.APP_VERSION);
