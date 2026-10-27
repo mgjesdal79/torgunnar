@@ -1,5 +1,5 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, jobItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes } from '../js/logic.js';
-const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge, taskItems, jobItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, deleteItem, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes };
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, jobItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes } from '../js/logic.js';
+const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge, taskItems, jobItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, deleteItem, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes };
 
 export function runTests() {
   const results = [];
@@ -823,6 +823,77 @@ export function runTests() {
     const after = s.items.find((i) => i.id === 'a');
     eq(after.removedAt, now);
     eq(after.purged, undefined); // ikke tømt ennå
+  });
+
+  // === Fullført-seksjon (build 20): ferdige blir liggende, ryddes samlet ===
+  t('fullført: ferdig gjøremål forlater taskItems og dukker opp i doneTaskItems', () => {
+    const now = '2026-10-27T10:00:00.000Z';
+    let s = defaultState();
+    s = addItem(s, { text: 'a', type: 'task' }, { now, id: 'a' });
+    s = addItem(s, { text: 'b', type: 'task' }, { now, id: 'b' });
+    s = completeItem(s, { id: 'a' }, { now });
+    eq(L.taskItems(s, now).map((i) => i.id), ['b']);     // aktiv liste: kun åpne
+    eq(L.doneTaskItems(s).map((i) => i.id), ['a']);      // fullført-seksjon
+  });
+  t('doneTaskItems: nyeste fullført først, utelater removed', () => {
+    const now = '2026-10-27T10:00:00.000Z';
+    let s = defaultState();
+    s = addItem(s, { text: 'a', type: 'task' }, { now, id: 'a' });
+    s = addItem(s, { text: 'b', type: 'task' }, { now, id: 'b' });
+    s = addItem(s, { text: 'c', type: 'task' }, { now, id: 'c' });
+    s = completeItem(s, { id: 'a' }, { now: '2026-10-27T08:00:00.000Z' });
+    s = completeItem(s, { id: 'b' }, { now: '2026-10-27T09:00:00.000Z' });
+    s = completeItem(s, { id: 'c' }, { now: '2026-10-27T07:00:00.000Z' });
+    eq(L.doneTaskItems(s).map((i) => i.id), ['b', 'a', 'c']);
+    s = deleteItem(s, { id: 'b' }, { now });
+    eq(L.doneTaskItems(s).map((i) => i.id), ['a', 'c']); // ryddet er borte
+  });
+  t('doneJobItems / doneSomedayItems skiller på type', () => {
+    const now = '2026-10-27T10:00:00.000Z';
+    let s = defaultState();
+    s = addItem(s, { text: 'j', type: 'job' }, { now, id: 'j' });
+    s = addItem(s, { text: 'm', type: 'someday' }, { now, id: 'm' });
+    s = completeItem(s, { id: 'j' }, { now });
+    s = completeItem(s, { id: 'm' }, { now });
+    eq(L.doneJobItems(s).map((i) => i.id), ['j']);
+    eq(L.doneSomedayItems(s).map((i) => i.id), ['m']);
+    eq(L.jobItems(s, now).length, 0);
+    eq(L.mediumItems(s).length, 0);
+  });
+  t('doneTodayItems: kun task/reminder krysset av i dag', () => {
+    const now = '2026-10-27T10:00:00.000Z';
+    let s = defaultState();
+    s = addItem(s, { text: 'idag', type: 'task' }, { now, id: 'a' });
+    s = addItem(s, { text: 'igår', type: 'task' }, { now, id: 'b' });
+    s = addItem(s, { text: 'someday', type: 'someday' }, { now, id: 'c' });
+    s = completeItem(s, { id: 'a' }, { now });                                 // i dag
+    s = completeItem(s, { id: 'b' }, { now: '2026-10-26T10:00:00.000Z' });     // i går
+    s = completeItem(s, { id: 'c' }, { now });                                 // someday, teller ikke
+    eq(L.doneTodayItems(s, now).map((i) => i.id), ['a']);
+  });
+  t('trashAllDone: frakter alle oppgitte ferdige til søppel, lar resten være', () => {
+    const now = '2026-10-27T10:00:00.000Z';
+    let s = defaultState();
+    s = addItem(s, { text: 'a', type: 'task' }, { now, id: 'a' });
+    s = addItem(s, { text: 'b', type: 'task' }, { now, id: 'b' });
+    s = addItem(s, { text: 'åpen', type: 'task' }, { now, id: 'c' });
+    s = completeItem(s, { id: 'a' }, { now });
+    s = completeItem(s, { id: 'b' }, { now });
+    const ids = L.doneTaskItems(s).map((i) => i.id);
+    s = L.trashAllDone(s, { ids }, { now, id: 'l' });
+    eq(L.doneTaskItems(s).length, 0);                 // fullført-seksjon tømt
+    eq(L.trashItems(s).map((i) => i.id).sort(), ['a', 'b']); // havnet i søppel
+    eq(L.taskItems(s, now).map((i) => i.id), ['c']);  // åpen sak urørt
+  });
+  t('fullført: angre (reopen) henter ferdig sak tilbake til aktiv liste', () => {
+    const now = '2026-10-27T10:00:00.000Z';
+    let s = defaultState();
+    s = addItem(s, { text: 'a', type: 'task' }, { now, id: 'a' });
+    s = completeItem(s, { id: 'a' }, { now });
+    eq(L.doneTaskItems(s).map((i) => i.id), ['a']);
+    s = reopenItem(s, { id: 'a' }, { now });
+    eq(L.doneTaskItems(s).length, 0);
+    eq(L.taskItems(s, now).map((i) => i.id), ['a']);
   });
   return results;
 }

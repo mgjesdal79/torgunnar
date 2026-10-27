@@ -126,6 +126,13 @@ function bind(root) {
     el.onclick = () => openDefer(el.dataset.defer));
   root.querySelectorAll('[data-undefer]').forEach((el) =>
     el.onclick = () => commit(L.undeferItem(App.state, { id: el.dataset.undefer }, ctx())));
+  root.querySelectorAll('[data-reopen]').forEach((el) =>
+    el.onclick = () => commit(L.reopenItem(App.state, { id: el.dataset.reopen }, ctx())));
+  root.querySelectorAll('[data-trashdone]').forEach((el) =>
+    el.onclick = () => {
+      const ids = el.dataset.trashdone.split(',').filter(Boolean);
+      commit(L.trashAllDone(App.state, { ids }, ctx()));
+    });
   root.querySelectorAll('[data-restore]').forEach((el) =>
     el.onclick = () => commit(L.restoreItem(App.state, { id: el.dataset.restore }, ctx())));
   root.querySelectorAll('[data-purge]').forEach((el) =>
@@ -363,6 +370,22 @@ function listCard(items) {
   return `<div class="card">${items.map(itemRowHtml).join('')}</div>`;
 }
 
+// Fullført rad: overstreket tekst + avkrysset sirkel man kan trykke for å angre
+// (hent tilbake til aktiv liste). Ingen andre knapper – ryddes samlet.
+function doneRowHtml(it) {
+  return `<div class="row"><span class="chk on" data-reopen="${it.id}" title="Angre – hent tilbake"></span>`
+    + `<div class="rtxt done"><div class="t">${esc(it.text)}</div></div></div>`;
+}
+
+// «✓ Fullført (N)»-seksjon nederst i en liste + samleknapp som frakter alt til søppel.
+function doneSection(items) {
+  if (!items.length) return '';
+  const ids = items.map((i) => i.id).join(',');
+  return `<h2>✓ Fullført (${items.length})</h2>`
+    + `<div class="card">${items.map(doneRowHtml).join('')}</div>`
+    + `<button class="btn ghost" data-trashdone="${ids}">Rydd fullførte → søppel</button>`;
+}
+
 function headerBar(title) {
   return `<div class="banner topnav" data-home="1" role="button" title="Til hjem">`
     + `<span class="back">‹</span>`
@@ -402,7 +425,7 @@ function renderTasks() {
   return headerBar('✅ Gjøremål')
     + `<div class="body">`
     + captureBlock({ fixedType: 'task', placeholder: 'Nytt gjøremål…' })
-    + body + `</div>`;
+    + body + doneSection(L.doneTaskItems(App.state)) + `</div>`;
 }
 
 function deferredJobRowHtml(it) {
@@ -428,7 +451,7 @@ function renderJob() {
   return headerBar('💼 Jobb')
     + `<div class="body">`
     + captureBlock({ fixedType: 'job', placeholder: 'Nytt jobb-gjøremål…' })
-    + body + deferredCard + `</div>`;
+    + body + deferredCard + doneSection(L.doneJobItems(App.state)) + `</div>`;
 }
 
 function noteRowHtml(it) {
@@ -502,9 +525,13 @@ function renderInbox() {
 }
 
 function renderToday() {
-  const items = L.itemsForToday(App.state, nowIso());
+  const now = nowIso();
+  const items = L.itemsForToday(App.state, now);
   return headerBar('📌 I dag')
-    + `<div class="body"><p class="sub">Det som krever deg nå.</p>` + listCard(items) + `</div>`;
+    + `<div class="body"><p class="sub">Det som krever deg nå.</p>`
+    + listCard(items)
+    + doneSection(L.doneTodayItems(App.state, now))
+    + `</div>`;
 }
 
 function daysUntil(iso) {
@@ -540,7 +567,7 @@ function renderMedium() {
   return headerBar('💛 Langsiktig')
     + `<div class="body">`
     + captureBlock({ fixedType: 'someday', placeholder: 'Fang noe til senere…' })
-    + body + `</div>`;
+    + body + doneSection(L.doneSomedayItems(App.state)) + `</div>`;
 }
 
 function konaRowHtml(it) {
