@@ -282,6 +282,34 @@ export function noteItems(state) {
     .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 }
 
+// --- Fullført: ferdige ting blir overstreket og blir liggende i lista si til
+// Martin selv rydder dem til søppelkassa («en viss glede i å ferdigstille»). ---
+// Felles: ferdige (done, ikke fjernet) av en gitt type, nyeste fullført først.
+function doneByType(state, type) {
+  return activeItems(state)
+    .filter((i) => i.type === type && i.done)
+    .sort((a, b) => (b.doneAt || '').localeCompare(a.doneAt || ''));
+}
+export function doneTaskItems(state) { return doneByType(state, 'task'); }
+export function doneJobItems(state) { return doneByType(state, 'job'); }
+export function doneSomedayItems(state) { return doneByType(state, 'someday'); }
+
+// Fullført i «I dag» = task/reminder krysset av i dag (det du faktisk fikk gjort i dag).
+export function doneTodayItems(state, now) {
+  const today = dayOf(now);
+  return activeItems(state)
+    .filter((i) => (i.type === 'task' || i.type === 'reminder') && i.done && dayOf(i.doneAt) === today)
+    .sort((a, b) => (b.doneAt || '').localeCompare(a.doneAt || ''));
+}
+
+// «Rydd fullførte → søppel»: flytter en liste ferdige (by id) til søppelkassa på
+// én gang. Gjenbruker deleteItem (soft-delete), så alt kan hentes tilbake derfra.
+export function trashAllDone(state, { ids }, ctx) {
+  let out = state;
+  for (const id of ids || []) out = deleteItem(out, { id }, ctx);
+  return out;
+}
+
 // Notat-badge: notater ligger passivt som standard. De som må gjøres om til en
 // aksjon slås på med toggleNoteBadge og telles her (forsidens 📝-badge).
 export function noteBadge(state) {
