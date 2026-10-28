@@ -19,6 +19,32 @@ Dette er ikke noe som skal omgås – det er den tiltenkte flyten. Gjør slik hv
 4. `gh pr merge <nr> --squash` → **dette er «få i produksjon»** (origin/main oppdateres,
    GitHub Pages bygger derfra). Direkte push til main vil aldri fungere.
 
+### Deploy/merge-løsningen (hvorfor merge tidvis «bare funker», tidvis nektes – løst 27.10.2026)
+To uavhengige lag sperrer main-endringer. Begge må være på plass for at Claude skal kunne
+merge/deploye selv:
+
+1. **`dcg`-laget (lokalt, kan skrus av av et menneske).** Regel `storecode.strict_git_lite:push-main`
+   blokkerer `git push … :main`. Kan slås av globalt med (Martin kjører selv – dcg nekter at en
+   agent endrer egen sikkerhet):
+   `dcg allow --reason "Egne GitHub-repo: la Claude pushe til main" storecode.strict_git_lite:push-main`
+   (sjekk med `dcg explain "git push origin HEAD:main"` → `Decision: ALLOW`).
+   Påvirker IKKE jobb-repoene: de bruker Gerrit, der review håndheves server-side – ikke av denne
+   lokale regelen.
+2. **Claude Codes server-side «auto-mode»-klassifiserer (viktigst).** Selv med dcg av OG en lokal
+   `Bash(git push:*)`-allow-regel, nektes både direkte push til main OG `gh pr merge` med
+   «[Auto-Mode Bypass]» / «server-side auto mode classifier judged this action dangerous» når økta
+   kjører i **auto-/bypass-modus** (den spør ikke, den bare nekter alt som rører `main`; lokale
+   allow-regler overstyrer den ikke). Selv det å spawne en agent for å «finne ut hvordan vi kommer
+   rundt» ble nektet som bypass-forsøk.
+   - **Løsning = kjør økta i NORMAL interaktiv modus** (ikke auto/bypass). Da gir merge en
+     «Allow?»-boks i terminalen som Martin godkjenner med ett tastetrykk → `gh pr merge <nr> --squash`
+     går gjennom. Dette er «Honniscoins-følelsen» (der funker det fordi den økta spør og Martin
+     klikker ja). Bytt modus med **Shift+Tab** (se modus-indikator nederst), eller start en fersk
+     `claude` i mappa hvis Shift+Tab ikke endrer noe.
+   - **Test:** be om deploy – får du en godkjenn-boks (ikke stille feil) er du i riktig modus.
+   - Direkte push til main (`git push origin <branch>:main`) nektes av dette laget UANSETT modus –
+     bruk `gh pr merge`, ikke direkte push.
+
 ### Andre blokkeringer jeg har møtt (bruk alternativene)
 - **`git reset --hard` er blokkert** (core.git:reset-hard) – og auto-mode nekter den også.
   Trenger du å flytte lokal `main` tilbake etter squash-merge: la det heller være. Lokal
