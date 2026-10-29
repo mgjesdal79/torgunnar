@@ -255,7 +255,9 @@ function captureBlock(opts) {
   return `<div class="capture card">`
     + `<textarea class="inp" id="capInput" rows="2" placeholder="${esc(o.placeholder || 'Fang en tanke…')}">${esc(cap.text)}</textarea>`
     + (showTypes ? `<div class="lab">Hva er dette?</div><div class="chips">${typeChips}</div>` : '')
-    + (showTypes ? insistChips('cap', cap) : '')
+    // Vis «hvor mye skal den mase?»-dultene også på faste-type-sider (f.eks. Langsiktig),
+    // ikke bare på forsiden. insistChips returnerer '' for alt annet enn someday.
+    + insistChips('cap', showTypes ? cap : { ...cap, type: o.fixedType })
     + `<button class="btn" id="capAddBtn">Legg til</button>`
     + `</div>`;
 }
