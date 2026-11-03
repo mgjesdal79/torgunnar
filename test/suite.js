@@ -1,5 +1,5 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, jobItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes } from '../js/logic.js';
-const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, isKonaPending, konaItems, konaBadge, taskItems, jobItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, deleteItem, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes };
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, jobItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, addImprovement, setItemBody, renderMarkdown, isKonaPending, konaItems, konaBadge, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes } from '../js/logic.js';
+const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, addImprovement, setItemBody, renderMarkdown, isKonaPending, konaItems, konaBadge, taskItems, jobItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, deleteItem, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes };
 
 export function runTests() {
   const results = [];
@@ -486,6 +486,93 @@ export function runTests() {
     s = L.setInsistence(s, { id: 'a', insistence: 'nag' }, { now: 'N' });
     s = L.setInsistence(s, { id: 'b', insistence: 'chill' }, { now: 'N' });
     eq(L.mediumBadge(s), { count: 1, level: 'open' });
+  });
+  t('mediumBadge teller nag + forfalt dult', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'nag', type: 'someday' }, { now: '2026-10-16T08:00:00.000Z', id: 'a' });
+    s = addItem(s, { text: 'dult', type: 'someday' }, { now: '2026-10-16T08:00:00.000Z', id: 'b' });
+    s = L.setInsistence(s, { id: 'a', insistence: 'nag' }, { now: '2026-10-16T08:00:00.000Z' });
+    s = L.setInsistence(s, { id: 'b', insistence: 'nudge', cadenceDays: 7 }, { now: '2026-10-16T08:00:00.000Z' });
+    // Før dult forfaller: kun nag.
+    eq(L.mediumBadge(s, '2026-10-20T08:00:00.000Z'), { count: 1, level: 'open' });
+    // Etter dult forfaller: nag + dult.
+    eq(L.mediumBadge(s, '2026-10-30T08:00:00.000Z'), { count: 2, level: 'open' });
+  });
+
+  // === Forbedring (🌱) ===
+  t('addItem default body er null', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'x', type: 'task' }, { now: 'N', id: 'a' });
+    eq(s.items[0].body, null);
+  });
+  t('addImprovement lager type improvement med body', () => {
+    let s = defaultState();
+    s = L.addImprovement(s, { text: 'Tittel', body: '**fet**' }, { now: 'N', id: 'a' });
+    const it = s.items[0];
+    eq(it.type, 'improvement');
+    eq(it.text, 'Tittel');
+    eq(it.body, '**fet**');
+    eq(it.done, false);
+  });
+  t('addImprovement uten body gir null', () => {
+    let s = defaultState();
+    s = L.addImprovement(s, { text: 'Tittel' }, { now: 'N', id: 'a' });
+    eq(s.items[0].body, null);
+  });
+  t('improvementItems: kun improvement, nyeste først', () => {
+    let s = defaultState();
+    s = L.addImprovement(s, { text: 'a' }, { now: '2026-11-01T08:00:00Z', id: 'a' });
+    s = L.addImprovement(s, { text: 'b' }, { now: '2026-11-02T08:00:00Z', id: 'b' });
+    s = addItem(s, { text: 't', type: 'task' }, { now: '2026-11-03T08:00:00Z', id: 't' });
+    eq(L.improvementItems(s).map((i) => i.id), ['b', 'a']);
+  });
+  t('improvementItems utelater slettede', () => {
+    let s = defaultState();
+    s = L.addImprovement(s, { text: 'a' }, { now: 'N', id: 'a' });
+    s = L.deleteItem(s, { id: 'a' }, { now: 'N2' });
+    eq(L.improvementItems(s).length, 0);
+  });
+  t('setItemBody trimmer og bumper updatedAt', () => {
+    let s = defaultState();
+    s = L.addImprovement(s, { text: 'a', body: 'gammel' }, { now: 'N', id: 'a' });
+    s = L.setItemBody(s, { id: 'a', body: '  ny  ' }, { now: 'N2' });
+    eq(s.items[0].body, 'ny');
+    eq(s.items[0].updatedAt, 'N2');
+  });
+  t('setItemBody med null gir null', () => {
+    let s = defaultState();
+    s = L.addImprovement(s, { text: 'a', body: 'noe' }, { now: 'N', id: 'a' });
+    s = L.setItemBody(s, { id: 'a', body: null }, { now: 'N2' });
+    eq(s.items[0].body, null);
+  });
+
+  // === renderMarkdown ===
+  t('renderMarkdown: fet og kursiv', () => {
+    eq(L.renderMarkdown('**Hei** og *der*'), '<p><strong>Hei</strong> og <em>der</em></p>');
+  });
+  t('renderMarkdown: overskrifter', () => {
+    eq(L.renderMarkdown('# A\n## B\n### C'), '<h3>A</h3><h4>B</h4><h5>C</h5>');
+  });
+  t('renderMarkdown: punktliste', () => {
+    eq(L.renderMarkdown('- a\n- b'), '<ul><li>a</li><li>b</li></ul>');
+  });
+  t('renderMarkdown: nummerert liste', () => {
+    eq(L.renderMarkdown('1. a\n2. b'), '<ol><li>a</li><li>b</li></ol>');
+  });
+  t('renderMarkdown: avsnitt med linjeskift', () => {
+    eq(L.renderMarkdown('a\nb\n\nc'), '<p>a<br>b</p><p>c</p>');
+  });
+  t('renderMarkdown: fet inne i punkt', () => {
+    eq(L.renderMarkdown('- **Utfordring:** noe'),
+      '<ul><li><strong>Utfordring:</strong> noe</li></ul>');
+  });
+  t('renderMarkdown: escaper HTML (XSS-trygt)', () => {
+    eq(L.renderMarkdown('<script>alert(1)</script>'),
+      '<p>&lt;script&gt;alert(1)&lt;/script&gt;</p>');
+  });
+  t('renderMarkdown: tom/null gir tom streng', () => {
+    eq(L.renderMarkdown(''), '');
+    eq(L.renderMarkdown(null), '');
   });
 
   // === Fra kona ===
