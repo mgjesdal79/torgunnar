@@ -131,6 +131,20 @@
   .wdrow{display:flex;flex-wrap:wrap;gap:6px}
   .progbar{height:4px;border-radius:3px;background:var(--line);margin:0 2px 8px;overflow:hidden}
   .progbar>i{display:block;height:100%;background:var(--bamboo)}
+  /* Forbedring (🌱) */
+  .card.improvement{padding:2px 14px 12px}
+  .imphead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:13px 2px 4px}
+  .imphead .t{font-weight:700;font-size:16px;flex:1;line-height:1.3}
+  .imphead .mini{margin:0;flex:none}
+  .card.improvement .inp{margin-bottom:8px}
+  .mdbody{color:var(--ink);font-size:14px;line-height:1.55;padding:2px 2px 4px}
+  .mdbody h3,.mdbody h4,.mdbody h5{margin:12px 0 4px;line-height:1.3}
+  .mdbody h3{font-size:16px}.mdbody h4{font-size:15px}.mdbody h5{font-size:14px}
+  .mdbody p{margin:6px 0}
+  .mdbody ul,.mdbody ol{margin:6px 0;padding-left:22px}
+  .mdbody li{margin:3px 0}
+  .mdbody strong{font-weight:700}
+  .mdbody em{font-style:italic}
   .build{text-align:center;color:var(--faint);font-size:11px;letter-spacing:.04em;
     padding:10px 0 calc(16px + env(safe-area-inset-bottom))}
 </style>
@@ -143,8 +157,8 @@
   window.SUPABASE_ANON_KEY = 'sb_publishable_iUwAfMrw1Ckrxbf1ZDLINA_xKUGyscg'; // publishable (public-safe)
 </script>
 <script type="module">
-  window.APP_VERSION = '21';
-  window.APP_BUILD = '2026-10-29';
+  window.APP_VERSION = '22';
+  window.APP_BUILD = '2026-11-03';
   const b = document.getElementById('build');
   if (b) b.textContent = 'build ' + window.APP_VERSION + ' · ' + window.APP_BUILD;
   import('./js/app.js?cb=' + window.APP_VERSION);

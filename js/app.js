@@ -8,6 +8,7 @@ const App = {
   capFixed: null, capStay: false,
   edit: null,
   timeEdit: null,
+  imp: { text: '', body: '' }, impEdit: null,
 };
 
 function ctx() { return { now: nowIso(), id: newId() }; }
@@ -40,18 +41,18 @@ function tileHtml(icon, label, badge, data) {
 
 function renderHome() {
   const now = nowIso();
-  const inboxN = L.inboxItems(App.state, now).length;
   const todayItems = L.itemsForToday(App.state, now);
   const taskN = L.taskItems(App.state, now).length;
   const jobN = L.jobItems(App.state, now).length;
-  const mediumN = L.mediumBadge(App.state);
+  const mediumN = L.mediumBadge(App.state, now);
   const konaN = L.konaBadge(App.state);
   const trashN = L.trashItems(App.state).length;
-  const tiles = tileHtml('📥', 'Innboks', { count: inboxN, level: inboxN ? 'hot' : 'calm' }, 'data-view="inbox"')
-    + tileHtml('✅', 'Gjøremål', { count: taskN, level: taskN ? 'open' : 'calm' }, 'data-view="tasks"')
+  // Innboks-tilen er skjult med vilje (forfalte dult lyser nå fra Langsiktig).
+  const tiles = tileHtml('✅', 'Gjøremål', { count: taskN, level: taskN ? 'open' : 'calm' }, 'data-view="tasks"')
     + tileHtml('💼', 'Jobb', { count: jobN, level: jobN ? 'open' : 'calm' }, 'data-view="job"')
     + tileHtml('💛', 'Langsiktig', mediumN, 'data-view="medium"')
     + tileHtml('📝', 'Notater', L.noteBadge(App.state), 'data-view="notes"')
+    + tileHtml('🌱', 'Forbedring', null, 'data-view="improvements"')
     + tileHtml('💬', 'Ingrid', konaN, 'data-view="kona"')
     + tileHtml('🔁', 'Rutiner', null, 'data-view="routines"')
     + tileHtml('⚙️', 'Innstillinger', null, 'data-view="settings"')
@@ -77,6 +78,7 @@ function render() {
   else if (v === 'job') root.innerHTML = renderJob();
   else if (v === 'medium') root.innerHTML = renderMedium();
   else if (v === 'notes') root.innerHTML = renderNotes();
+  else if (v === 'improvements') root.innerHTML = renderImprovements();
   else if (v === 'kona') root.innerHTML = renderKona();
   else if (v === 'routines') root.innerHTML = renderRoutines();
   else if (v === 'settings') root.innerHTML = renderSettings();
@@ -152,6 +154,25 @@ function bind(root) {
     el.onclick = () => openEdit(el.dataset.edit));
   root.querySelectorAll('[data-notebadge]').forEach((el) =>
     el.onclick = () => commit(L.toggleNoteBadge(App.state, { id: el.dataset.notebadge }, ctx())));
+  // --- Forbedring (🌱) ---
+  const impTitle = root.querySelector('#impTitle');
+  if (impTitle) impTitle.oninput = () => { App.imp.text = impTitle.value; };
+  const impBody = root.querySelector('#impBody');
+  if (impBody) impBody.oninput = () => { App.imp.body = impBody.value; };
+  const impAdd = root.querySelector('#impAddBtn');
+  if (impAdd) impAdd.onclick = submitImprovement;
+  root.querySelectorAll('[data-impedit]').forEach((el) =>
+    el.onclick = () => openImprovementEdit(el.dataset.impedit));
+  const ieTitle = root.querySelector('#impEditTitle');
+  if (ieTitle) ieTitle.oninput = () => { App.impEdit.text = ieTitle.value; };
+  const ieBody = root.querySelector('#impEditBody');
+  if (ieBody) ieBody.oninput = () => { App.impEdit.body = ieBody.value; };
+  const ieSave = root.querySelector('#impEditSave');
+  if (ieSave) ieSave.onclick = saveImprovementEdit;
+  const ieCancel = root.querySelector('#impEditCancel');
+  if (ieCancel) ieCancel.onclick = () => { App.impEdit = null; render(); };
+  const ieDel = root.querySelector('#impEditDelete');
+  if (ieDel) ieDel.onclick = deleteImprovementFromEdit;
   root.querySelectorAll('[data-rtoggle]').forEach((el) =>
     el.onclick = () => { const id = el.dataset.rtoggle; App.rOpen[id] = !App.rOpen[id]; render(); });
   root.querySelectorAll('[data-rsub]').forEach((el) =>
@@ -501,6 +522,88 @@ function renderNotes() {
     + `<div class="body">`
     + captureBlock({ fixedType: 'note', placeholder: 'Nytt notat…' })
     + body + `</div>`;
+}
+
+// --- Forbedring (🌱): overskrift + lengre Markdown-beskrivelse, ingen avkryssing ---
+function improvementAddBlock() {
+  const i = App.imp || { text: '', body: '' };
+  return `<div class="capture card">`
+    + `<input class="inp" id="impTitle" placeholder="Overskrift…" value="${esc(i.text)}">`
+    + `<textarea class="inp" id="impBody" rows="5" placeholder="Beskrivelse – Markdown: **fet**, ## overskrift, - punkt…">${esc(i.body)}</textarea>`
+    + `<button class="btn" id="impAddBtn">Legg til</button>`
+    + `</div>`;
+}
+
+function improvementEditForm() {
+  const e = App.impEdit;
+  return `<input class="inp" id="impEditTitle" placeholder="Overskrift…" value="${esc(e.text)}">`
+    + `<textarea class="inp" id="impEditBody" rows="7" placeholder="Beskrivelse…">${esc(e.body)}</textarea>`
+    + `<div class="editacts"><button class="btn" id="impEditSave">Lagre</button>`
+    + `<button class="mini" id="impEditCancel">Avbryt</button>`
+    + `<button class="mini danger" id="impEditDelete">Slett</button></div>`;
+}
+
+function improvementCardHtml(it) {
+  if (App.impEdit && App.impEdit.id === it.id) {
+    return `<div class="card improvement">${improvementEditForm()}</div>`;
+  }
+  const bodyHtml = it.body ? `<div class="mdbody">${L.renderMarkdown(it.body)}</div>` : '';
+  return `<div class="card improvement">`
+    + `<div class="imphead"><div class="t">${esc(it.text)}</div>`
+    + `<button class="mini" data-impedit="${it.id}">Rediger</button></div>`
+    + bodyHtml
+    + `</div>`;
+}
+
+function renderImprovements() {
+  const items = L.improvementItems(App.state);
+  const body = items.length
+    ? items.map(improvementCardHtml).join('')
+    : `<p class="sub">Ingenting her ennå 🌱 Legg til noe du vil ta vare på eller jobbe med.</p>`;
+  return headerBar('🌱 Forbedring')
+    + `<div class="body">`
+    + improvementAddBlock()
+    + body + `</div>`;
+}
+
+function submitImprovement() {
+  const t = (App.imp.text || '').trim();
+  const b = (App.imp.body || '').trim();
+  if (!t && !b) return;
+  const c = ctx();
+  App.state = L.addImprovement(App.state, { text: t, body: b || null }, c);
+  App.imp = { text: '', body: '' };
+  saveStateDebounced(App.state); render();
+}
+
+function openImprovementEdit(id) {
+  const it = App.state.items.find((i) => i.id === id);
+  if (!it) return;
+  App.impEdit = { id, text: it.text || '', body: it.body || '' };
+  render();
+}
+
+function saveImprovementEdit() {
+  const e = App.impEdit;
+  if (!e) return;
+  const t = (e.text || '').trim();
+  const b = (e.body || '').trim();
+  if (!t && !b) { // helt tom → slett (til søppel)
+    App.impEdit = null;
+    commit(L.deleteItem(App.state, { id: e.id }, ctx()));
+    return;
+  }
+  const c = ctx();
+  let next = L.setItemText(App.state, { id: e.id, text: e.text }, c);
+  next = L.setItemBody(next, { id: e.id, body: b || null }, { now: c.now, id: newId() });
+  App.impEdit = null;
+  App.state = next; saveStateDebounced(App.state); render();
+}
+
+function deleteImprovementFromEdit() {
+  const id = App.impEdit.id;
+  App.impEdit = null;
+  commit(L.deleteItem(App.state, { id }, ctx()));
 }
 
 function nudgeRowHtml(it) {

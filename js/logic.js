@@ -38,11 +38,11 @@ export function migrate(state, today) {
 
 function pushLog(out, entry) { out.log.push(entry); }
 
-export function addItem(state, { text, type = null, category = null, source = null }, ctx) {
+export function addItem(state, { text, type = null, category = null, source = null, body = null }, ctx) {
   const out = clone(state);
   const item = {
     id: ctx.id, text: String(text || '').trim(),
-    type, category,
+    type, category, body: body == null ? null : String(body),
     done: false, doneAt: null,
     due: null, remindAt: null,
     resurfaceAt: null, deferred: false, iosPushedAt: null,
@@ -691,8 +691,83 @@ export function mediumItems(state) {
       || (b.createdAt || '').localeCompare(a.createdAt || ''));
 }
 
-export function mediumBadge(state) {
+export function mediumBadge(state, now) {
+  // Innboks-tilen er skjult, så forfalte «dult» (nudgeDue) må lyse herfra også,
+  // ellers strandes de. Teller nag + forfalte dult.
   const n = activeItems(state)
-    .filter((i) => i.type === 'someday' && !i.done && i.insistence === 'nag').length;
+    .filter((i) => i.type === 'someday' && !i.done
+      && (i.insistence === 'nag' || nudgeDue(i, now))).length;
   return { count: n, level: n ? 'open' : 'calm' };
+}
+
+export function improvementItems(state) {
+  return activeItems(state)
+    .filter((i) => i.type === 'improvement')
+    .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+}
+
+export function addImprovement(state, { text, body = null }, ctx) {
+  return addItem(state, { text, type: 'improvement', body }, ctx);
+}
+
+export function setItemBody(state, { id, body }, ctx) {
+  return patchItem(state, id, (it) => {
+    it.body = body == null ? null : String(body).trim();
+  }, ctx);
+}
+
+// Liten, trygg Markdown-delmengde. Escaper HTML FØRST (innhold synkes mellom
+// enheter), så vi introduserer kun <strong>/<em>/<h3-5>/<ul|ol>/<li>/<p>/<br>.
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"]/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+function inlineMd(escaped) {
+  return escaped
+    .replace(/\*\*([^*\n]+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*\n]+?)\*/g, '<em>$1</em>');
+}
+export function renderMarkdown(src) {
+  const lines = String(src == null ? '' : src).split(/\r?\n/);
+  const out = [];
+  let para = [];
+  let list = null; // { type: 'ul'|'ol', items: [] }
+  const flushPara = () => {
+    if (para.length) { out.push('<p>' + para.join('<br>') + '</p>'); para = []; }
+  };
+  const flushList = () => {
+    if (list) {
+      out.push('<' + list.type + '>'
+        + list.items.map((x) => '<li>' + x + '</li>').join('')
+        + '</' + list.type + '>');
+      list = null;
+    }
+  };
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, '');
+    if (!line.trim()) { flushPara(); flushList(); continue; }
+    let m;
+    if ((m = line.match(/^(#{1,3})\s+(.*)$/))) {
+      flushPara(); flushList();
+      const level = m[1].length + 2; // # -> h3, ## -> h4, ### -> h5
+      out.push('<h' + level + '>' + inlineMd(escHtml(m[2])) + '</h' + level + '>');
+      continue;
+    }
+    if ((m = line.match(/^\s*\d+\.\s+(.*)$/))) {
+      flushPara();
+      if (!list || list.type !== 'ol') { flushList(); list = { type: 'ol', items: [] }; }
+      list.items.push(inlineMd(escHtml(m[1])));
+      continue;
+    }
+    if ((m = line.match(/^\s*[-*]\s+(.*)$/))) {
+      flushPara();
+      if (!list || list.type !== 'ul') { flushList(); list = { type: 'ul', items: [] }; }
+      list.items.push(inlineMd(escHtml(m[1])));
+      continue;
+    }
+    flushList();
+    para.push(inlineMd(escHtml(line)));
+  }
+  flushPara(); flushList();
+  return out.join('');
 }
