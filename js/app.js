@@ -895,11 +895,13 @@ function renderSettings() {
 }
 
 function doComplete(id, el) {
-  el.classList.add('on', 'pop');
-  if (navigator.vibrate) navigator.vibrate(12);
+  el.classList.add('on', 'pop', 'burst');
+  if (navigator.vibrate) navigator.vibrate([10, 25, 12]);
+  const row = el.closest('.row');
+  if (row) setTimeout(() => row.classList.add('leaving'), 160);
   setTimeout(() => {
     commit(L.completeItem(App.state, { id }, ctx()));
-  }, 140);
+  }, 300);
 }
 
 const DEFER_PRESETS = [

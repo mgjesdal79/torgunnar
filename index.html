@@ -57,12 +57,26 @@
   .sub{color:var(--dim);font-size:13px;margin:0 2px 12px}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
     padding:2px 14px;margin-bottom:12px}
-  .row{display:flex;align-items:center;gap:12px;padding:13px 2px;border-bottom:1px solid var(--line)}
+  .row{display:flex;align-items:center;gap:11px;padding:9px 2px;border-bottom:1px solid var(--line)}
   .row:last-child{border-bottom:none}
-  .chk{width:26px;height:26px;border-radius:50%;border:2px solid var(--faint);flex:none;cursor:pointer;
-    transition:transform .12s ease, background .12s ease}
+  .row.leaving{animation:rowleave .24s ease forwards;overflow:hidden;pointer-events:none}
+  @keyframes rowleave{0%{opacity:1;transform:translateX(0);max-height:120px}
+    100%{opacity:0;transform:translateX(18px);max-height:0;padding-top:0;padding-bottom:0}}
+  .chk{width:22px;height:22px;border-radius:50%;border:2px solid var(--faint);flex:none;cursor:pointer;
+    position:relative;transition:transform .12s ease, background .12s ease, border-color .12s ease}
   .chk.on{background:var(--bamboo);border-color:var(--bamboo)}
-  .chk.pop{transform:scale(1.25)}
+  .chk.pop{transform:scale(1.28)}
+  /* hvit hake som tegner seg inn */
+  .chk::after{content:"";position:absolute;left:50%;top:46%;width:5px;height:9px;
+    border:solid #06220d;border-width:0 2.5px 2.5px 0;
+    transform:translate(-50%,-50%) rotate(45deg) scale(0);
+    transition:transform .18s cubic-bezier(.2,.9,.3,1.5)}
+  .chk.on::after{transform:translate(-50%,-50%) rotate(45deg) scale(1)}
+  /* ring-burst ved avkryssing */
+  .chk::before{content:"";position:absolute;inset:-3px;border-radius:50%;
+    border:2px solid var(--bamboo);opacity:0;transform:scale(.6);pointer-events:none}
+  .chk.burst::before{animation:chkburst .5s ease-out}
+  @keyframes chkburst{0%{opacity:.75;transform:scale(.6)}100%{opacity:0;transform:scale(2)}}
   .rtxt{flex:1}.rtxt .t{font-weight:600}.rtxt .m{font-size:12px;color:var(--dim);margin-top:2px}
   .rtxt.done .t{text-decoration:line-through;color:var(--faint)}
   .mini{background:none;border:1px solid var(--line);color:var(--dim);border-radius:999px;
@@ -167,7 +181,7 @@
   window.SUPABASE_ANON_KEY = 'sb_publishable_iUwAfMrw1Ckrxbf1ZDLINA_xKUGyscg'; // publishable (public-safe)
 </script>
 <script type="module">
-  window.APP_VERSION = '23';
+  window.APP_VERSION = '24';
   window.APP_BUILD = '2026-11-05';
   const b = document.getElementById('build');
   if (b) b.textContent = 'build ' + window.APP_VERSION + ' · ' + window.APP_BUILD;
