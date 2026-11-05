@@ -8,7 +8,8 @@ const App = {
   capFixed: null, capStay: false,
   edit: null,
   timeEdit: null,
-  imp: { text: '', body: '' }, impEdit: null,
+  imp: { text: '', body: '', depth: '' }, impEdit: null,
+  impAddOpen: false, impOpen: {},
 };
 
 function ctx() { return { now: nowIso(), id: newId() }; }
@@ -159,14 +160,26 @@ function bind(root) {
   if (impTitle) impTitle.oninput = () => { App.imp.text = impTitle.value; };
   const impBody = root.querySelector('#impBody');
   if (impBody) impBody.oninput = () => { App.imp.body = impBody.value; };
+  const impDepth = root.querySelector('#impDepth');
+  if (impDepth) impDepth.oninput = () => { App.imp.depth = impDepth.value; };
   const impAdd = root.querySelector('#impAddBtn');
   if (impAdd) impAdd.onclick = submitImprovement;
+  const impAddToggle = root.querySelector('[data-impaddtoggle]');
+  if (impAddToggle) impAddToggle.onclick = () => { App.impAddOpen = !App.impAddOpen; render(); };
   root.querySelectorAll('[data-impedit]').forEach((el) =>
     el.onclick = () => openImprovementEdit(el.dataset.impedit));
+  root.querySelectorAll('[data-impexpand]').forEach((el) =>
+    el.onclick = () => { const id = el.dataset.impexpand; App.impOpen[id] = !App.impOpen[id]; render(); });
+  root.querySelectorAll('[data-impup]').forEach((el) =>
+    el.onclick = () => commit(L.reorderImprovement(App.state, { id: el.dataset.impup, dir: 'up' }, ctx())));
+  root.querySelectorAll('[data-impdown]').forEach((el) =>
+    el.onclick = () => commit(L.reorderImprovement(App.state, { id: el.dataset.impdown, dir: 'down' }, ctx())));
   const ieTitle = root.querySelector('#impEditTitle');
   if (ieTitle) ieTitle.oninput = () => { App.impEdit.text = ieTitle.value; };
   const ieBody = root.querySelector('#impEditBody');
   if (ieBody) ieBody.oninput = () => { App.impEdit.body = ieBody.value; };
+  const ieDepth = root.querySelector('#impEditDepth');
+  if (ieDepth) ieDepth.oninput = () => { App.impEdit.depth = ieDepth.value; };
   const ieSave = root.querySelector('#impEditSave');
   if (ieSave) ieSave.onclick = saveImprovementEdit;
   const ieCancel = root.querySelector('#impEditCancel');
@@ -526,11 +539,16 @@ function renderNotes() {
 
 // --- Forbedring (🌱): overskrift + lengre Markdown-beskrivelse, ingen avkryssing ---
 function improvementAddBlock() {
-  const i = App.imp || { text: '', body: '' };
+  if (!App.impAddOpen) {
+    return `<button class="addmini" data-impaddtoggle>＋ Ny forbedring</button>`;
+  }
+  const i = App.imp || { text: '', body: '', depth: '' };
   return `<div class="capture card">`
     + `<input class="inp" id="impTitle" placeholder="Overskrift…" value="${esc(i.text)}">`
     + `<textarea class="inp" id="impBody" rows="5" placeholder="Beskrivelse – Markdown: **fet**, ## overskrift, - punkt…">${esc(i.body)}</textarea>`
-    + `<button class="btn" id="impAddBtn">Legg til</button>`
+    + `<textarea class="inp" id="impDepth" rows="4" placeholder="Dybde (valgfritt) – dyptgående påfyll, samme Markdown…">${esc(i.depth)}</textarea>`
+    + `<div class="editacts"><button class="btn" id="impAddBtn">Legg til</button>`
+    + `<button class="mini" data-impaddtoggle>Avbryt</button></div>`
     + `</div>`;
 }
 
@@ -538,27 +556,39 @@ function improvementEditForm() {
   const e = App.impEdit;
   return `<input class="inp" id="impEditTitle" placeholder="Overskrift…" value="${esc(e.text)}">`
     + `<textarea class="inp" id="impEditBody" rows="7" placeholder="Beskrivelse…">${esc(e.body)}</textarea>`
+    + `<textarea class="inp" id="impEditDepth" rows="5" placeholder="Dybde (valgfritt) – dyptgående påfyll…">${esc(e.depth)}</textarea>`
     + `<div class="editacts"><button class="btn" id="impEditSave">Lagre</button>`
     + `<button class="mini" id="impEditCancel">Avbryt</button>`
     + `<button class="mini danger" id="impEditDelete">Slett</button></div>`;
 }
 
-function improvementCardHtml(it) {
+function improvementCardHtml(it, isFirst, isLast) {
   if (App.impEdit && App.impEdit.id === it.id) {
     return `<div class="card improvement">${improvementEditForm()}</div>`;
   }
   const bodyHtml = it.body ? `<div class="mdbody">${L.renderMarkdown(it.body)}</div>` : '';
+  const open = !!App.impOpen[it.id];
+  const depthToggle = it.depth
+    ? `<button class="expand" data-impexpand="${it.id}">${open ? 'Vis mindre ⌃' : 'Vis mer ⌄'}</button>`
+    : '';
+  const depthHtml = (it.depth && open)
+    ? `<div class="mddepth">${L.renderMarkdown(it.depth)}</div>` : '';
+  const upBtn = isFirst ? '' : `<button class="mini ord" data-impup="${it.id}" title="Flytt opp">▲</button>`;
+  const downBtn = isLast ? '' : `<button class="mini ord" data-impdown="${it.id}" title="Flytt ned">▼</button>`;
   return `<div class="card improvement">`
     + `<div class="imphead"><div class="t">${esc(it.text)}</div>`
-    + `<button class="mini" data-impedit="${it.id}">Rediger</button></div>`
+    + `<div class="impacts">${upBtn}${downBtn}`
+    + `<button class="mini" data-impedit="${it.id}">Rediger</button></div></div>`
     + bodyHtml
+    + depthToggle
+    + depthHtml
     + `</div>`;
 }
 
 function renderImprovements() {
   const items = L.improvementItems(App.state);
   const body = items.length
-    ? items.map(improvementCardHtml).join('')
+    ? items.map((it, i) => improvementCardHtml(it, i === 0, i === items.length - 1)).join('')
     : `<p class="sub">Ingenting her ennå 🌱 Legg til noe du vil ta vare på eller jobbe med.</p>`;
   return headerBar('🌱 Forbedring')
     + `<div class="body">`
@@ -569,17 +599,19 @@ function renderImprovements() {
 function submitImprovement() {
   const t = (App.imp.text || '').trim();
   const b = (App.imp.body || '').trim();
-  if (!t && !b) return;
+  const d = (App.imp.depth || '').trim();
+  if (!t && !b && !d) return;
   const c = ctx();
-  App.state = L.addImprovement(App.state, { text: t, body: b || null }, c);
-  App.imp = { text: '', body: '' };
+  App.state = L.addImprovement(App.state, { text: t, body: b || null, depth: d || null }, c);
+  App.imp = { text: '', body: '', depth: '' };
+  App.impAddOpen = false;
   saveStateDebounced(App.state); render();
 }
 
 function openImprovementEdit(id) {
   const it = App.state.items.find((i) => i.id === id);
   if (!it) return;
-  App.impEdit = { id, text: it.text || '', body: it.body || '' };
+  App.impEdit = { id, text: it.text || '', body: it.body || '', depth: it.depth || '' };
   render();
 }
 
@@ -588,7 +620,8 @@ function saveImprovementEdit() {
   if (!e) return;
   const t = (e.text || '').trim();
   const b = (e.body || '').trim();
-  if (!t && !b) { // helt tom → slett (til søppel)
+  const d = (e.depth || '').trim();
+  if (!t && !b && !d) { // helt tom → slett (til søppel)
     App.impEdit = null;
     commit(L.deleteItem(App.state, { id: e.id }, ctx()));
     return;
@@ -596,6 +629,7 @@ function saveImprovementEdit() {
   const c = ctx();
   let next = L.setItemText(App.state, { id: e.id, text: e.text }, c);
   next = L.setItemBody(next, { id: e.id, body: b || null }, { now: c.now, id: newId() });
+  next = L.setItemDepth(next, { id: e.id, depth: d || null }, { now: c.now, id: newId() });
   App.impEdit = null;
   App.state = next; saveStateDebounced(App.state); render();
 }

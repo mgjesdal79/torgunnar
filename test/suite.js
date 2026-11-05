@@ -1,5 +1,5 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, jobItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, addImprovement, setItemBody, renderMarkdown, isKonaPending, konaItems, konaBadge, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes } from '../js/logic.js';
-const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, addImprovement, setItemBody, renderMarkdown, isKonaPending, konaItems, konaBadge, taskItems, jobItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, deleteItem, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes };
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, jobItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes } from '../js/logic.js';
+const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, taskItems, jobItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, deleteItem, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes };
 
 export function runTests() {
   const results = [];
@@ -544,6 +544,74 @@ export function runTests() {
     s = L.addImprovement(s, { text: 'a', body: 'noe' }, { now: 'N', id: 'a' });
     s = L.setItemBody(s, { id: 'a', body: null }, { now: 'N2' });
     eq(s.items[0].body, null);
+  });
+
+  // === Forbedring: dybde-felt + manuell rekkefølge (build23) ===
+  t('addImprovement tar med depth; uten depth → null', () => {
+    let s = defaultState();
+    s = L.addImprovement(s, { text: 'a', depth: '## Dypt' }, { now: 'N', id: 'a' });
+    eq(s.items[0].depth, '## Dypt');
+    s = L.addImprovement(s, { text: 'b' }, { now: 'N', id: 'b' });
+    eq(s.items.find((i) => i.id === 'b').depth, null);
+  });
+  t('setItemDepth trimmer og bumper updatedAt; null → null', () => {
+    let s = defaultState();
+    s = L.addImprovement(s, { text: 'a' }, { now: 'N', id: 'a' });
+    s = L.setItemDepth(s, { id: 'a', depth: '  dyp  ' }, { now: 'N2' });
+    eq(s.items[0].depth, 'dyp');
+    eq(s.items[0].updatedAt, 'N2');
+    s = L.setItemDepth(s, { id: 'a', depth: null }, { now: 'N3' });
+    eq(s.items[0].depth, null);
+  });
+  t('addImprovement: nye legger seg øverst (lavest order)', () => {
+    let s = defaultState();
+    s = L.addImprovement(s, { text: 'a' }, { now: '2026-11-01T08:00:00Z', id: 'a' });
+    s = L.addImprovement(s, { text: 'b' }, { now: '2026-11-02T08:00:00Z', id: 'b' });
+    s = L.addImprovement(s, { text: 'c' }, { now: '2026-11-03T08:00:00Z', id: 'c' });
+    eq(L.improvementItems(s).map((i) => i.id), ['c', 'b', 'a']);
+  });
+  t('reorderImprovement: flytt opp bytter med naboen over', () => {
+    let s = defaultState();
+    s = L.addImprovement(s, { text: 'a' }, { now: '2026-11-01T08:00:00Z', id: 'a' });
+    s = L.addImprovement(s, { text: 'b' }, { now: '2026-11-02T08:00:00Z', id: 'b' });
+    // rekkefølge nå: b, a (nyest øverst). Flytt a opp → a, b
+    s = L.reorderImprovement(s, { id: 'a', dir: 'up' }, { now: 'N3' });
+    eq(L.improvementItems(s).map((i) => i.id), ['a', 'b']);
+  });
+  t('reorderImprovement: flytt ned bytter med naboen under', () => {
+    let s = defaultState();
+    s = L.addImprovement(s, { text: 'a' }, { now: '2026-11-01T08:00:00Z', id: 'a' });
+    s = L.addImprovement(s, { text: 'b' }, { now: '2026-11-02T08:00:00Z', id: 'b' });
+    // rekkefølge: b, a. Flytt b ned → a, b
+    s = L.reorderImprovement(s, { id: 'b', dir: 'down' }, { now: 'N3' });
+    eq(L.improvementItems(s).map((i) => i.id), ['a', 'b']);
+  });
+  t('reorderImprovement: ingen-op i endene', () => {
+    let s = defaultState();
+    s = L.addImprovement(s, { text: 'a' }, { now: '2026-11-01T08:00:00Z', id: 'a' });
+    s = L.addImprovement(s, { text: 'b' }, { now: '2026-11-02T08:00:00Z', id: 'b' });
+    const before = L.improvementItems(s).map((i) => i.id); // ['b','a']
+    s = L.reorderImprovement(s, { id: 'b', dir: 'up' }, { now: 'N3' });   // allerede øverst
+    s = L.reorderImprovement(s, { id: 'a', dir: 'down' }, { now: 'N4' }); // allerede nederst
+    eq(L.improvementItems(s).map((i) => i.id), before);
+  });
+  t('reorderImprovement bumper updatedAt på begge byttede', () => {
+    let s = defaultState();
+    s = L.addImprovement(s, { text: 'a' }, { now: '2026-11-01T08:00:00Z', id: 'a' });
+    s = L.addImprovement(s, { text: 'b' }, { now: '2026-11-02T08:00:00Z', id: 'b' });
+    s = L.reorderImprovement(s, { id: 'a', dir: 'up' }, { now: 'N3' });
+    eq(s.items.find((i) => i.id === 'a').updatedAt, 'N3');
+    eq(s.items.find((i) => i.id === 'b').updatedAt, 'N3');
+  });
+  t('migrate backfiller order på gamle forbedringer (nyest øverst)', () => {
+    const raw = { items: [
+      { id: 'a', type: 'improvement', text: 'a', createdAt: '2026-11-01T08:00:00Z' },
+      { id: 'b', type: 'improvement', text: 'b', createdAt: '2026-11-03T08:00:00Z' },
+      { id: 'c', type: 'improvement', text: 'c', createdAt: '2026-11-02T08:00:00Z' },
+    ] };
+    const s = L.migrate(raw, '2026-11-05');
+    // nyest (b) skal få lavest order → øverst; så c; så a
+    eq(L.improvementItems(s).map((i) => i.id), ['b', 'c', 'a']);
   });
 
   // === renderMarkdown ===
