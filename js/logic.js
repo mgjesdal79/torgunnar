@@ -33,16 +33,24 @@ export function migrate(state, today) {
   out.log = out.log.slice(-LOG_KEEP);
   if (!Array.isArray(out.routineInstances)) out.routineInstances = [];
   if (today) out.routineInstances = out.routineInstances.filter((i) => i.date >= today);
+  // build23: backfill manuell rekkefølge (order) på forbedringer laget før feltet fantes.
+  // Standard var nyest øverst → gi nyeste lavest order.
+  const imps = out.items.filter((i) => i.type === 'improvement' && !i.removed);
+  if (imps.length && imps.every((i) => i.order == null)) {
+    imps.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    imps.forEach((it, i) => { it.order = i; });
+  }
   return out;
 }
 
 function pushLog(out, entry) { out.log.push(entry); }
 
-export function addItem(state, { text, type = null, category = null, source = null, body = null }, ctx) {
+export function addItem(state, { text, type = null, category = null, source = null, body = null, depth = null, order = null }, ctx) {
   const out = clone(state);
   const item = {
     id: ctx.id, text: String(text || '').trim(),
     type, category, body: body == null ? null : String(body),
+    depth: depth == null ? null : String(depth), order,
     done: false, doneAt: null,
     due: null, remindAt: null,
     resurfaceAt: null, deferred: false, iosPushedAt: null,
@@ -703,17 +711,50 @@ export function mediumBadge(state, now) {
 export function improvementItems(state) {
   return activeItems(state)
     .filter((i) => i.type === 'improvement')
-    .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    .sort((a, b) => {
+      const ao = a.order, bo = b.order;
+      if (ao != null && bo != null && ao !== bo) return ao - bo;
+      if (ao != null && bo == null) return -1;
+      if (ao == null && bo != null) return 1;
+      return (b.createdAt || '').localeCompare(a.createdAt || '');
+    });
 }
 
-export function addImprovement(state, { text, body = null }, ctx) {
-  return addItem(state, { text, type: 'improvement', body }, ctx);
+export function addImprovement(state, { text, body = null, depth = null }, ctx) {
+  // Ny forbedring legger seg øverst → lavest order (ett under nåværende minimum).
+  const orders = improvementItems(state).map((i) => i.order).filter((o) => o != null);
+  const order = orders.length ? Math.min(...orders) - 1 : 0;
+  return addItem(state, { text, type: 'improvement', body, depth, order }, ctx);
 }
 
 export function setItemBody(state, { id, body }, ctx) {
   return patchItem(state, id, (it) => {
     it.body = body == null ? null : String(body).trim();
   }, ctx);
+}
+
+export function setItemDepth(state, { id, depth }, ctx) {
+  return patchItem(state, id, (it) => {
+    it.depth = depth == null ? null : String(depth).trim();
+  }, ctx);
+}
+
+// Manuell rekkefølge: bytt order med naboen over/under i den sorterte lista.
+// Bumper updatedAt på begge (LWW-vennlig synk). Ingen-op i endene.
+export function reorderImprovement(state, { id, dir }, ctx) {
+  const list = improvementItems(state);
+  const idx = list.findIndex((i) => i.id === id);
+  if (idx < 0) return state;
+  const swapIdx = dir === 'up' ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= list.length) return state;
+  const out = clone(state);
+  const a = out.items.find((i) => i.id === list[idx].id);
+  const b = out.items.find((i) => i.id === list[swapIdx].id);
+  const ao = a.order == null ? idx : a.order;
+  const bo = b.order == null ? swapIdx : b.order;
+  a.order = bo; b.order = ao;
+  a.updatedAt = ctx.now; b.updatedAt = ctx.now;
+  return out;
 }
 
 // Liten, trygg Markdown-delmengde. Escaper HTML FØRST (innhold synkes mellom
