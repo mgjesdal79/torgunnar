@@ -11,6 +11,7 @@ const App = {
   imp: { text: '', body: '', depth: '' }, impEdit: null,
   impAddOpen: false, impOpen: {},
   rowOpen: {},
+  doneRtnOpen: false,
 };
 
 function ctx() { return { now: nowIso(), id: newId() }; }
@@ -185,6 +186,8 @@ function bind(root) {
   if (ieDel) ieDel.onclick = deleteImprovementFromEdit;
   root.querySelectorAll('[data-rtoggle]').forEach((el) =>
     el.onclick = () => { const id = el.dataset.rtoggle; App.rOpen[id] = !App.rOpen[id]; render(); });
+  root.querySelectorAll('[data-donertntoggle]').forEach((el) =>
+    el.onclick = () => { App.doneRtnOpen = !App.doneRtnOpen; render(); });
   root.querySelectorAll('[data-rsub]').forEach((el) =>
     el.onclick = () => {
       const [instanceId, subId] = el.dataset.rsub.split('|');
@@ -847,7 +850,7 @@ function sleepRowHtml(r) {
 }
 
 function tmplRowHtml(r) {
-  const when = r.sleeping ? 'sovende' : ((r.weekdays || []).length ? r.weekdays.map((k) => WD_LABEL[k] || k).join(' ') : 'ingen dager');
+  const when = r.sleeping ? 'inaktiv' : ((r.weekdays || []).length ? r.weekdays.map((k) => WD_LABEL[k] || k).join(' ') : 'ingen dager');
   return `<div class="row"><div class="rtxt"><div class="t">${r.enabled ? '' : '⏸ '}${esc(r.title)}</div>`
     + `<div class="m">${esc(when)}${r.leadDay ? ' · dagen før' : ''}</div></div>`
     + `<button class="mini" data-redit="${r.id}">✎</button></div>`;
@@ -859,18 +862,29 @@ function renderRoutines() {
   const todayInst = L.routineInstancesForDate(App.state, today);
   const tomInst = L.routineInstancesForDate(App.state, tomorrow);
   const sleeping = L.sleepingRoutines(App.state);
-  // Rutiner som allerede vises over (I dag / For i morgen / Sovende) – unngå duplikater.
+  // Rutiner som allerede vises over (I dag / For i morgen / Inaktive) – unngå duplikater.
   const shown = new Set();
   todayInst.forEach((i) => shown.add(i.routineId));
   tomInst.forEach((i) => shown.add(i.routineId));
   sleeping.forEach((r) => shown.add(r.id));
   const others = App.state.settings.routines.filter((r) => !shown.has(r.id));
+  // Utførte rutiner legges litt bort fra «I dag»-lista, i en egen (lukket) seksjon.
+  const activeToday = todayInst.filter((i) => !i.done);
+  const doneToday = todayInst.filter((i) => i.done);
+  let doneSec = '';
+  if (doneToday.length) {
+    const open = App.doneRtnOpen;
+    doneSec = `<h2 class="collapse ${open ? 'open' : ''}" data-donertntoggle="1">`
+      + `✓ Fullført i dag (${doneToday.length}) <span class="caret">⌄</span></h2>`
+      + (open ? doneToday.map(instCardHtml).join('') : '');
+  }
   return headerBar('🔁 Rutiner')
     + `<div class="body">`
     + `<p class="sub">Dine rutiner maser ikke – du henter dem når du vil.</p>`
-    + `<h2>I dag</h2>` + (todayInst.length ? todayInst.map(instCardHtml).join('') : `<p class="sub">Ingen aktive i dag.</p>`)
+    + `<h2>I dag</h2>` + (activeToday.length ? activeToday.map(instCardHtml).join('') : `<p class="sub">Ingen aktive i dag.</p>`)
+    + doneSec
     + (tomInst.length ? `<h2>For i morgen 🌙</h2>` + tomInst.map(instCardHtml).join('') : '')
-    + `<h2>Sovende</h2>` + (sleeping.length ? `<div class="card">${sleeping.map(sleepRowHtml).join('')}</div>` : `<p class="sub">Ingen sovende rutiner.</p>`)
+    + `<h2>Inaktive</h2>` + (sleeping.length ? `<div class="card">${sleeping.map(sleepRowHtml).join('')}</div>` : `<p class="sub">Ingen inaktive rutiner.</p>`)
     + (others.length ? `<h2>Andre rutiner</h2><div class="card">${others.map(tmplRowHtml).join('')}</div>` : '')
     + `<button class="btn" data-rnew="1">＋ Ny rutine</button>`
     + `</div>`;
@@ -902,7 +916,7 @@ function renderRoutineEditor() {
     + `<button class="btn ghost" id="eAddSub">＋ Deloppgave</button>`
     + `<div class="lab">Ukedager</div><div class="wdrow">${wdChips}</div>`
     + `<div class="lab">Valg</div><div class="chips">`
-    + `<span class="chip ${e.sleeping ? 'on' : ''}" data-etgl="sleeping">💤 Sovende (vekk ved behov)</span>`
+    + `<span class="chip ${e.sleeping ? 'on' : ''}" data-etgl="sleeping">💤 Inaktiv (vekk ved behov)</span>`
     + `<span class="chip ${e.leadDay ? 'on' : ''}" data-etgl="leadDay">🌙 Vis fra dagen før</span>`
     + `<span class="chip ${e.enabled ? 'on' : ''}" data-etgl="enabled">På</span></div>`
     + `<button class="btn" id="eSave">${e.id ? 'Lagre endringer' : 'Lagre rutine'}</button>`
