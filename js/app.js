@@ -9,7 +9,7 @@ const App = {
   edit: null,
   timeEdit: null,
   imp: { text: '', body: '', depth: '' }, impEdit: null,
-  impAddOpen: false, impOpen: {},
+  impAddOpen: false, impOpen: {}, impDepth: {},
   rowOpen: {},
   doneRtnOpen: false,
 };
@@ -172,6 +172,8 @@ function bind(root) {
     el.onclick = () => openImprovementEdit(el.dataset.impedit));
   root.querySelectorAll('[data-impexpand]').forEach((el) =>
     el.onclick = () => { const id = el.dataset.impexpand; App.impOpen[id] = !App.impOpen[id]; render(); });
+  root.querySelectorAll('[data-impdepth]').forEach((el) =>
+    el.onclick = () => { const id = el.dataset.impdepth; App.impDepth[id] = !App.impDepth[id]; render(); });
   const ieTitle = root.querySelector('#impEditTitle');
   if (ieTitle) ieTitle.oninput = () => { App.impEdit.text = ieTitle.value; };
   const ieBody = root.querySelector('#impEditBody');
@@ -655,22 +657,26 @@ function improvementCardHtml(it) {
   if (App.impEdit && App.impEdit.id === it.id) {
     return `<div class="card improvement" data-row-id="${it.id}">${improvementEditForm()}</div>`;
   }
-  const bodyHtml = it.body ? `<div class="mdbody">${L.renderMarkdown(it.body)}</div>` : '';
   const open = !!App.impOpen[it.id];
-  const depthToggle = it.depth
-    ? `<button class="expand" data-impexpand="${it.id}">${open ? 'Vis mindre ⌃' : 'Vis mer ⌄'}</button>`
-    : '';
-  const depthHtml = (it.depth && open)
-    ? `<div class="mddepth">${L.renderMarkdown(it.depth)}</div>` : '';
   const handle = `<span class="draghandle" data-draghandle="${it.id}" title="Dra for å flytte">⠿</span>`;
-  return `<div class="card improvement" data-row-id="${it.id}">`
-    + `<div class="imphead">${handle}<div class="t">${esc(it.text)}</div>`
-    + `<div class="impacts">`
-    + `<button class="mini" data-impedit="${it.id}">Rediger</button></div></div>`
-    + bodyHtml
-    + depthToggle
-    + depthHtml
-    + `</div>`;
+  // Kollapset: bare overskrift. Klikk på overskriften ekspanderer alt under
+  // (beskrivelse, evt. dybde bak «Vis mer», og Rediger).
+  const head = `<div class="imphead ${open ? 'open' : ''}">${handle}`
+    + `<div class="t" data-impexpand="${it.id}">${esc(it.text)}</div>`
+    + `<span class="caret" data-impexpand="${it.id}">⌄</span></div>`;
+  let detail = '';
+  if (open) {
+    const bodyHtml = it.body ? `<div class="mdbody">${L.renderMarkdown(it.body)}</div>` : '';
+    const dOpen = !!App.impDepth[it.id];
+    const depthToggle = it.depth
+      ? `<button class="expand" data-impdepth="${it.id}">${dOpen ? 'Vis mindre ⌃' : 'Vis mer ⌄'}</button>`
+      : '';
+    const depthHtml = (it.depth && dOpen)
+      ? `<div class="mddepth">${L.renderMarkdown(it.depth)}</div>` : '';
+    detail = bodyHtml + depthToggle + depthHtml
+      + `<div class="impacts"><button class="mini" data-impedit="${it.id}">Rediger</button></div>`;
+  }
+  return `<div class="card improvement" data-row-id="${it.id}">${head}${detail}</div>`;
 }
 
 function renderImprovements() {
