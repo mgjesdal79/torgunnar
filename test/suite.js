@@ -1,5 +1,5 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, jobItems, reorderItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, inactiveRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, improvementCategories, improvementGroups, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes } from '../js/logic.js';
-const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, inactiveRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, improvementCategories, improvementGroups, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, taskItems, jobItems, reorderItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, deleteItem, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes };
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, jobItems, reorderItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, inactiveRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, improvementCategories, improvementGroups, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, konaTrashItems, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes } from '../js/logic.js';
+const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, inactiveRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, improvementCategories, improvementGroups, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, konaTrashItems, taskItems, jobItems, reorderItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, deleteItem, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes };
 
 export function runTests() {
   const results = [];
@@ -751,6 +751,33 @@ export function runTests() {
     s = addItem(s, { text: 'A', source: 'kona' }, { now: '2026-10-16T08:00:00.000Z', id: 'a' });
     s = addItem(s, { text: 'B', source: 'kona' }, { now: '2026-10-16T08:00:01.000Z', id: 'b' });
     eq(L.konaBadge(s), { count: 2, level: 'open' });
+  });
+  t('konaTrashItems: slettet kona-lapp havner i egen liste, ikke i søppelkassa', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'A', source: 'kona' }, { now: '2026-10-16T08:00:00.000Z', id: 'a' });
+    s = deleteItem(s, { id: 'a' }, { now: 'N' });
+    eq(L.konaTrashItems(s).map((i) => i.id), ['a']);
+    eq(L.konaItems(s).length, 0);
+    eq(L.trashItems(s).length, 0); // holdes utenfor den vanlige søppelkassa
+  });
+  t('konaTrashItems nyeste først; gjenoppretting setter tilbake i lista', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'Eldst', source: 'kona' }, { now: '2026-10-16T08:00:00.000Z', id: 'a' });
+    s = addItem(s, { text: 'Nyest', source: 'kona' }, { now: '2026-10-16T08:00:01.000Z', id: 'b' });
+    s = deleteItem(s, { id: 'a' }, { now: '2026-10-16T09:00:00.000Z' });
+    s = deleteItem(s, { id: 'b' }, { now: '2026-10-16T10:00:00.000Z' });
+    eq(L.konaTrashItems(s).map((i) => i.id), ['b', 'a']);
+    s = L.restoreItem(s, { id: 'b' }, { now: 'N' });
+    eq(L.konaTrashItems(s).map((i) => i.id), ['a']);
+    ok(L.konaItems(s).some((i) => i.id === 'b'));
+  });
+  t('triagert kona-lapp som slettes går til vanlig søppelkasse', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'A', source: 'kona' }, { now: '2026-10-16T08:00:00.000Z', id: 'a' });
+    s = classifyItem(s, { id: 'a', type: 'task' }, { now: 'N' });
+    s = deleteItem(s, { id: 'a' }, { now: 'N2' });
+    eq(L.konaTrashItems(s).length, 0);
+    eq(L.trashItems(s).map((i) => i.id), ['a']);
   });
   t('inboxItems ekskluderer kona, beholder vanlige untypede', () => {
     let s = defaultState();

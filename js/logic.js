@@ -152,9 +152,12 @@ export function deleteItem(state, { id }, ctx) {
 }
 
 // Søppelkasse: slettet (removed) men ikke tømt for godt (purged). Nyeste først.
+// Slettede Ingrid-lapper (source=kona, ennå uten type) hører til Ingrids egen
+// «Slettet»-liste (konaTrashItems) og holdes utenfor den vanlige søppelkassa.
 export function trashItems(state) {
   return (state.items || [])
     .filter((i) => i.removed && !i.purged)
+    .filter((i) => !(i.source === 'kona' && i.type == null))
     .sort((a, b) => (b.removedAt || '').localeCompare(a.removedAt || ''));
 }
 
@@ -244,6 +247,15 @@ export function konaItems(state) {
 export function konaBadge(state) {
   const count = konaItems(state).length;
   return { count, level: count ? 'open' : 'calm' };
+}
+
+// Slettede Ingrid-lapper: dismisset (removed) før triagering (ennå source=kona,
+// uten type). Egen «Slettet»-liste i Ingrid-visningen – holdes utenfor den vanlige
+// søppelkassa. Nyeste først. Gjenoppretting setter removed=false → tilbake til lista.
+export function konaTrashItems(state) {
+  return (state.items || [])
+    .filter((i) => i.source === 'kona' && i.type == null && i.removed && !i.purged)
+    .sort((a, b) => (b.removedAt || '').localeCompare(a.removedAt || ''));
 }
 
 export function itemsForToday(state, now) {
