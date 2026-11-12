@@ -106,6 +106,23 @@
   textarea.inp{resize:vertical;min-height:64px;font-family:inherit;line-height:1.4}
   .taskacts{display:flex;flex-wrap:wrap;gap:6px;padding:2px 2px 12px}
   .taskacts .mini{margin:0}
+  /* Kompakt gjøremåls-/jobbliste: alle rader i ett felt, ingen ramme per rad */
+  .droplist{padding:0 12px}
+  .trow{border-bottom:1px solid var(--line)}
+  .trow:last-child{border-bottom:none}
+  .droplist .row{border-bottom:none;padding:7px 0;gap:9px}
+  .draghandle{flex:none;width:20px;text-align:center;color:var(--faint);font-size:17px;
+    line-height:1;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent;
+    user-select:none;-webkit-user-select:none}
+  .draghandle:active{cursor:grabbing}
+  .trow.dragging{background:var(--surface2);border-radius:12px;opacity:.9;
+    box-shadow:0 6px 18px rgba(0,0,0,.35)}
+  .rowexp{flex:none;background:none;border:none;color:var(--faint);font-size:18px;line-height:1;
+    padding:6px 4px;cursor:pointer;transition:transform .15s ease;-webkit-tap-highlight-color:transparent}
+  .rowexp.open{transform:rotate(180deg);color:var(--bamboo)}
+  .rowpanel{padding:0 0 4px 29px}
+  .rowpanel .taskacts{padding:2px 0 10px}
+  .rowpanel .timeedit{padding:4px 0 12px}
   .timeedit{padding:4px 2px 14px}
   .tdisp{display:flex;align-items:baseline;gap:12px;justify-content:center;
     background:var(--surface2);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px}
@@ -181,8 +198,8 @@
   window.SUPABASE_ANON_KEY = 'sb_publishable_iUwAfMrw1Ckrxbf1ZDLINA_xKUGyscg'; // publishable (public-safe)
 </script>
 <script type="module">
-  window.APP_VERSION = '24';
-  window.APP_BUILD = '2026-11-05';
+  window.APP_VERSION = '25';
+  window.APP_BUILD = '2026-11-12';
   const b = document.getElementById('build');
   if (b) b.textContent = 'build ' + window.APP_VERSION + ' · ' + window.APP_BUILD;
   import('./js/app.js?cb=' + window.APP_VERSION);

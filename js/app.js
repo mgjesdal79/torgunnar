@@ -10,6 +10,7 @@ const App = {
   timeEdit: null,
   imp: { text: '', body: '', depth: '' }, impEdit: null,
   impAddOpen: false, impOpen: {},
+  rowOpen: {},
 };
 
 function ctx() { return { now: nowIso(), id: newId() }; }
@@ -219,6 +220,14 @@ function bind(root) {
   if (tCancel) tCancel.onclick = () => { App.timeEdit = null; render(); };
   root.querySelectorAll('[data-ios]').forEach((el) =>
     el.onclick = () => pushToIos(el.dataset.ios));
+  root.querySelectorAll('[data-rowexp]').forEach((el) =>
+    el.onclick = () => {
+      const id = el.dataset.rowexp;
+      App.rowOpen[id] = !App.rowOpen[id];
+      if (!App.rowOpen[id] && isTimeEditing(id)) App.timeEdit = null;
+      render();
+    });
+  bindDrag(root);
   const ssSave = root.querySelector('#setShortcutSave');
   if (ssSave) ssSave.onclick = () => {
     const v = root.querySelector('#setShortcut').value;
@@ -244,6 +253,55 @@ function bind(root) {
     konaAdd.onclick = add;
     inp.onkeydown = (ev) => { if (ev.key === 'Enter') add(); };
   }
+}
+
+// --- Dra-og-slipp for gjøremåls-/jobblista ---------------------------------
+// Pointer-basert (fungerer på touch der native HTML5-drag er upålitelig). Vi
+// flytter raden i DOM-en live mens man drar, og skriver ny rekkefølge først ved
+// slipp (leser id-ene slik de ligger, kaller L.reorderItems).
+let drag = null;
+function bindDrag(root) {
+  root.querySelectorAll('[data-draghandle]').forEach((handle) => {
+    handle.onpointerdown = (ev) => startDrag(ev, handle);
+  });
+}
+function startDrag(ev, handle) {
+  const trow = handle.closest('.trow');
+  const list = handle.closest('.droplist');
+  if (!trow || !list) return;
+  ev.preventDefault();
+  drag = { trow, list, moved: false };
+  trow.classList.add('dragging');
+  try { handle.setPointerCapture(ev.pointerId); } catch (e) {}
+  handle.onpointermove = onDragMove;
+  handle.onpointerup = endDrag;
+  handle.onpointercancel = endDrag;
+}
+function onDragMove(ev) {
+  if (!drag) return;
+  ev.preventDefault();
+  drag.moved = true;
+  const rows = [...drag.list.querySelectorAll('.trow:not(.dragging)')];
+  const y = ev.clientY;
+  let before = null;
+  for (const r of rows) {
+    const box = r.getBoundingClientRect();
+    if (y < box.top + box.height / 2) { before = r; break; }
+  }
+  if (before) drag.list.insertBefore(drag.trow, before);
+  else drag.list.appendChild(drag.trow);
+}
+function endDrag(ev) {
+  if (!drag) return;
+  const { list, trow, moved } = drag;
+  trow.classList.remove('dragging');
+  const handle = ev.currentTarget;
+  try { handle.releasePointerCapture(ev.pointerId); } catch (e) {}
+  handle.onpointermove = handle.onpointerup = handle.onpointercancel = null;
+  drag = null;
+  if (!moved) return;
+  const orderedIds = [...list.querySelectorAll('.trow')].map((r) => r.dataset.rowId);
+  commit(L.reorderItems(App.state, { orderedIds }, ctx()));
 }
 
 // Ekte item-typer (brukes i redigering). Ingrid er en kilde, ikke en type.
@@ -430,33 +488,46 @@ function headerBar(title) {
 }
 
 function taskRowHtml(it) {
-  if (isEditing(it.id)) return `<div class="card">${editForm()}</div>`;
+  if (isEditing(it.id)) return `<div class="trow editing" data-row-id="${it.id}">${editForm()}</div>`;
   const now = nowIso();
   const chk = `<span class="chk ${it.done ? 'on' : ''}" data-done="${it.id}"></span>`;
   const meta = [];
   if (it.remindAt) meta.push('⏰ ' + fmtDateTime(it.remindAt));
   else if (it.due) meta.push('🗓 ' + it.due);
   if (it.deferred && it.resurfaceAt && !L.isResurfaced(it, now)) meta.push('💤 tilbake ' + fmtDate(it.resurfaceAt));
-  const timeBtn = `<button class="mini" data-settime="${it.id}">⏰ ${it.remindAt ? 'Endre tid' : 'Sett tid'}</button>`;
-  const iosBtn = it.remindAt
-    ? (it.iosPushedAt
-        ? `<button class="mini" data-ios="${it.id}">✓ i Påminnelser · send på nytt</button>`
-        : `<button class="mini" data-ios="${it.id}">⏰ Legg i Påminnelser</button>`)
-    : '';
-  const head = `<div class="row">${chk}`
+  const open = !!App.rowOpen[it.id] || isTimeEditing(it.id);
+  const handle = `<span class="draghandle" data-draghandle="${it.id}" title="Dra for å flytte">⠿</span>`;
+  const exp = `<button class="rowexp ${open ? 'open' : ''}" data-rowexp="${it.id}" title="Tid og valg">⌵</button>`;
+  const head = `<div class="row">${handle}${chk}`
     + `<div class="rtxt ${it.done ? 'done' : ''}" data-edit="${it.id}"><div class="t">${esc(it.text)}</div>`
     + (meta.length ? `<div class="m">${esc(meta.join(' · '))}</div>` : '')
-    + `</div></div>`;
-  if (isTimeEditing(it.id)) return `<div class="card">${head}${timeEditHtml()}</div>`;
-  return `<div class="card">${head}`
-    + `<div class="taskacts">${timeBtn}${iosBtn}`
-    + `<button class="mini" data-defer="${it.id}">Ikke nå</button></div></div>`;
+    + `</div>${exp}</div>`;
+  let panel = '';
+  if (isTimeEditing(it.id)) {
+    panel = `<div class="rowpanel">${timeEditHtml()}</div>`;
+  } else if (open) {
+    const timeBtn = `<button class="mini" data-settime="${it.id}">⏰ ${it.remindAt ? 'Endre tid' : 'Sett tid'}</button>`;
+    const iosBtn = it.remindAt
+      ? (it.iosPushedAt
+          ? `<button class="mini" data-ios="${it.id}">✓ i Påminnelser · send på nytt</button>`
+          : `<button class="mini" data-ios="${it.id}">⏰ Legg i Påminnelser</button>`)
+      : '';
+    panel = `<div class="rowpanel"><div class="taskacts">${timeBtn}${iosBtn}`
+      + `<button class="mini" data-defer="${it.id}">Ikke nå</button></div></div>`;
+  }
+  return `<div class="trow" data-row-id="${it.id}">${head}${panel}</div>`;
+}
+
+// Hele gjøremåls-/jobblista i ett felt (ingen ramme per rad) som også er drop-sone
+// for dra-og-slipp. Tomme lister rendres av kalleren.
+function taskListCard(items) {
+  return `<div class="card droplist">${items.map(taskRowHtml).join('')}</div>`;
 }
 
 function renderTasks() {
   const items = L.taskItems(App.state, nowIso());
   const body = items.length
-    ? items.map(taskRowHtml).join('')
+    ? taskListCard(items)
     : `<p class="sub">Ingen gjøremål nå 🌱</p>`;
   return headerBar('✅ Gjøremål')
     + `<div class="body">`
@@ -479,7 +550,7 @@ function renderJob() {
   const items = L.jobItems(App.state, now);
   const deferred = L.deferredJobItems(App.state, now);
   const body = items.length
-    ? items.map(taskRowHtml).join('')
+    ? taskListCard(items)
     : `<p class="sub">Ingen jobb-gjøremål nå 🌱</p>`;
   const deferredCard = deferred.length
     ? `<h2>💤 Utsatt</h2><div class="card">${deferred.map(deferredJobRowHtml).join('')}</div>`
