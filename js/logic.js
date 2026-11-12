@@ -655,6 +655,17 @@ export function sleepingRoutines(state) {
   return (state.settings.routines || []).filter((r) => r.sleeping);
 }
 
+// Rutiner uten en aktiv instans for dagen (ikke vekket, eller lagt bort igjen).
+// Alle rutiner starter her hver dag; man aktiverer dem manuelt ved behov.
+export function inactiveRoutines(state, today) {
+  const active = new Set(
+    (state.routineInstances || [])
+      .filter((i) => i.date === today && !i.skipped)
+      .map((i) => i.routineId)
+  );
+  return (state.settings.routines || []).filter((r) => !active.has(r.id));
+}
+
 // ---- Rutiner: avkryssing ----
 export function allSubtasksDone(inst) {
   const subs = (inst && inst.subtasks) || [];
