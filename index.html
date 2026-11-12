@@ -174,6 +174,13 @@
   .progbar>i{display:block;height:100%;background:var(--bamboo)}
   /* Forbedring (🌱) */
   .card.improvement{padding:2px 14px 12px}
+  /* Samle forbedringene i en kategori i ett felles kort med tynne skillelinjer */
+  .impgroup{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:0 14px;margin-bottom:14px}
+  .impgroup .card.improvement{border:none;background:none;border-radius:0;
+    margin:0;padding:2px 0 10px;border-bottom:1px solid var(--line)}
+  .impgroup .card.improvement:last-child{border-bottom:none}
+  .impgroup .card.improvement.dragging{background:var(--surface2);border-radius:12px;padding-left:10px;padding-right:10px}
   .imphead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 2px 4px}
   .imphead .t{font-weight:700;font-size:16px;flex:1;line-height:1.3;cursor:pointer}
   .imphead .caret{flex:none;color:var(--faint);font-size:16px;cursor:pointer;
@@ -211,7 +218,7 @@
   window.SUPABASE_ANON_KEY = 'sb_publishable_iUwAfMrw1Ckrxbf1ZDLINA_xKUGyscg'; // publishable (public-safe)
 </script>
 <script type="module">
-  window.APP_VERSION = '32';
+  window.APP_VERSION = '33';
   window.APP_BUILD = '2026-11-12';
   const b = document.getElementById('build');
   if (b) b.textContent = 'build ' + window.APP_VERSION + ' · ' + window.APP_BUILD;

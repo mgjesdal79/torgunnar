@@ -701,7 +701,7 @@ function renderImprovements() {
     // Hver kategori får en synlig overskrift og sin egen drop-sone (dra innen gruppe).
     body = groups.map((g) => {
       const head = `<h2 class="impcat">${g.category ? esc(g.category) : 'Uten kategori'}</h2>`;
-      return head + `<div data-droplist="items">${g.items.map(improvementCardHtml).join('')}</div>`;
+      return head + `<div class="impgroup" data-droplist="items">${g.items.map(improvementCardHtml).join('')}</div>`;
     }).join('');
   }
   return headerBar('🌱 Forbedring')
