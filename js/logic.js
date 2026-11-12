@@ -763,11 +763,39 @@ export function improvementItems(state) {
     });
 }
 
-export function addImprovement(state, { text, body = null, depth = null }, ctx) {
+export function addImprovement(state, { text, body = null, depth = null, category = null }, ctx) {
   // Ny forbedring legger seg øverst → lavest order (ett under nåværende minimum).
   const orders = improvementItems(state).map((i) => i.order).filter((o) => o != null);
   const order = orders.length ? Math.min(...orders) - 1 : 0;
-  return addItem(state, { text, type: 'improvement', body, depth, order }, ctx);
+  const cat = category == null || !String(category).trim() ? null : String(category).trim();
+  return addItem(state, { text, type: 'improvement', body, depth, category: cat, order }, ctx);
+}
+
+// Distinkte kategorinavn brukt på forbedringer (for forslag/datalist), sortert.
+export function improvementCategories(state) {
+  const seen = new Set();
+  improvementItems(state).forEach((i) => {
+    const c = (i.category || '').trim();
+    if (c) seen.add(c);
+  });
+  return [...seen].sort((a, b) => a.localeCompare(b, 'nb'));
+}
+
+// Forbedringer gruppert etter kategori. Returnerer [{ category, items }], der
+// navngitte kategorier kommer først (alfabetisk), og «uten kategori» til slutt.
+// Rekkefølgen innen hver gruppe arver improvementItems-sorteringen (order).
+export function improvementGroups(state) {
+  const items = improvementItems(state);
+  const groups = new Map();
+  items.forEach((i) => {
+    const c = (i.category || '').trim() || null;
+    if (!groups.has(c)) groups.set(c, []);
+    groups.get(c).push(i);
+  });
+  const named = [...groups.keys()].filter((c) => c != null)
+    .sort((a, b) => a.localeCompare(b, 'nb'));
+  const order = named.concat(groups.has(null) ? [null] : []);
+  return order.map((c) => ({ category: c, items: groups.get(c) }));
 }
 
 export function setItemBody(state, { id, body }, ctx) {

@@ -1,5 +1,5 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, jobItems, reorderItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, inactiveRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes } from '../js/logic.js';
-const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, inactiveRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, taskItems, jobItems, reorderItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, deleteItem, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes };
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, jobItems, reorderItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, inactiveRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, improvementCategories, improvementGroups, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes } from '../js/logic.js';
+const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, inactiveRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, improvementCategories, improvementGroups, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, taskItems, jobItems, reorderItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, deleteItem, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes };
 
 export function runTests() {
   const results = [];
@@ -569,6 +569,33 @@ export function runTests() {
     s = L.addImprovement(s, { text: 'a' }, { now: 'N', id: 'a' });
     s = L.deleteItem(s, { id: 'a' }, { now: 'N2' });
     eq(L.improvementItems(s).length, 0);
+  });
+  t('addImprovement tar med kategori (trimmet); tom → null', () => {
+    let s = defaultState();
+    s = L.addImprovement(s, { text: 'a', category: '  Oppgaver ' }, { now: 'N', id: 'a' });
+    eq(s.items.find((i) => i.id === 'a').category, 'Oppgaver');
+    s = L.addImprovement(s, { text: 'b', category: '   ' }, { now: 'N', id: 'b' });
+    eq(s.items.find((i) => i.id === 'b').category, null);
+  });
+  t('improvementCategories: distinkte, sortert, uten tomme', () => {
+    let s = defaultState();
+    s = L.addImprovement(s, { text: 'a', category: 'Egenpleie' }, { now: 'N', id: 'a' });
+    s = L.addImprovement(s, { text: 'b', category: 'Oppgaver' }, { now: 'N', id: 'b' });
+    s = L.addImprovement(s, { text: 'c', category: 'Oppgaver' }, { now: 'N', id: 'c' });
+    s = L.addImprovement(s, { text: 'd' }, { now: 'N', id: 'd' });
+    eq(L.improvementCategories(s), ['Egenpleie', 'Oppgaver']);
+  });
+  t('improvementGroups: navngitte alfabetisk først, uten-kategori sist', () => {
+    let s = defaultState();
+    s = L.addImprovement(s, { text: 'u' }, { now: 'N', id: 'u' });
+    s = L.addImprovement(s, { text: 'o', category: 'Oppgaver' }, { now: 'N', id: 'o' });
+    s = L.addImprovement(s, { text: 'a', category: 'Anerkjennelse' }, { now: 'N', id: 'a' });
+    const g = L.improvementGroups(s);
+    eq(g.map((x) => x.category), ['Anerkjennelse', 'Oppgaver', null]);
+    eq(g[2].items.map((i) => i.id), ['u']);
+  });
+  t('improvementGroups tom state → tom liste', () => {
+    eq(L.improvementGroups(defaultState()).length, 0);
   });
   t('setItemBody trimmer og bumper updatedAt', () => {
     let s = defaultState();

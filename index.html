@@ -46,12 +46,15 @@
     border-radius:var(--radius);padding:16px 8px 13px;text-align:center;cursor:pointer}
   .tile .ic{font-size:27px;display:block;margin-bottom:7px}
   .tile .lb{font-size:13px;font-weight:600}
+  .tile .subcount{display:block;font-size:11px;color:var(--faint);margin-top:3px;font-variant-numeric:tabular-nums}
   .badge{position:absolute;top:8px;right:8px;min-width:22px;height:22px;border-radius:999px;
     font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 6px}
   .badge.hot{background:var(--rose);color:#fff}
   .badge.open{background:var(--bamboo);color:#06220d}
   .badge.calm{display:none}
   h2{font-size:18px;margin:14px 2px 8px}
+  h2.impcat{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--bamboo);
+    margin:18px 2px 8px;font-weight:700}
   h2.todayhead{cursor:pointer}
   h2.todayhead::after{content:' ›';color:var(--faint)}
   h2.collapse{cursor:pointer;color:var(--dim);display:flex;align-items:center;gap:6px;
@@ -208,7 +211,7 @@
   window.SUPABASE_ANON_KEY = 'sb_publishable_iUwAfMrw1Ckrxbf1ZDLINA_xKUGyscg'; // publishable (public-safe)
 </script>
 <script type="module">
-  window.APP_VERSION = '30';
+  window.APP_VERSION = '31';
   window.APP_BUILD = '2026-11-12';
   const b = document.getElementById('build');
   if (b) b.textContent = 'build ' + window.APP_VERSION + ' · ' + window.APP_BUILD;
