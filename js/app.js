@@ -18,10 +18,9 @@ function ctx() { return { now: nowIso(), id: newId() }; }
 function commit(next) { App.state = next; saveStateDebounced(App.state); render(); }
 
 function syncRoutines(s) {
-  const today = todayIso();
-  let next = L.pruneRoutineInstances(s, today);
-  next = L.generateRoutineInstances(next, today, ctx());
-  return next;
+  // Ingen auto-generering lenger: alle rutiner starter inaktive hver dag og
+  // aktiveres manuelt. Vi rydder bare bort gårsdagens instanser (daglig reset).
+  return L.pruneRoutineInstances(s, todayIso());
 }
 
 function esc(s) {
@@ -825,8 +824,6 @@ function renderKona() {
     + list + `</div>`;
 }
 
-const WD = [['mon', 'Man'], ['tue', 'Tir'], ['wed', 'Ons'], ['thu', 'Tor'], ['fri', 'Fre'], ['sat', 'Lør'], ['sun', 'Søn']];
-const WD_LABEL = {}; WD.forEach(([k, l]) => { WD_LABEL[k] = l; });
 
 function instCardHtml(inst) {
   const subs = inst.subtasks || [];
@@ -843,55 +840,38 @@ function instCardHtml(inst) {
     + `<span class="sub">${d} av ${n} gjort</span></div>`
     + (n ? `<div class="progbar"><i style="width:${pct}%"></i></div>` : '')
     + (open ? `<div class="rbody">${rows}`
-        + `<button class="mini" data-rskip="${inst.id}">Ikke i dag</button>`
+        + `<button class="mini" data-rskip="${inst.id}">Legg bort</button>`
         + `<button class="mini" data-redit="${inst.routineId}">Rediger mal</button></div>` : '')
     + `</div>`;
 }
 
-function sleepRowHtml(r) {
+function inactiveRowHtml(r) {
   return `<div class="row"><div class="rtxt"><div class="t">${esc(r.title)}</div>`
     + `<div class="m">${(r.subtasks || []).length} steg</div></div>`
-    + `<button class="mini" data-rwake="${r.id}">Vekk</button>`
-    + `<button class="mini" data-redit="${r.id}">✎</button></div>`;
-}
-
-function tmplRowHtml(r) {
-  const when = r.sleeping ? 'inaktiv' : ((r.weekdays || []).length ? r.weekdays.map((k) => WD_LABEL[k] || k).join(' ') : 'ingen dager');
-  return `<div class="row"><div class="rtxt"><div class="t">${r.enabled ? '' : '⏸ '}${esc(r.title)}</div>`
-    + `<div class="m">${esc(when)}${r.leadDay ? ' · dagen før' : ''}</div></div>`
+    + `<button class="mini" data-rwake="${r.id}">Aktiver</button>`
     + `<button class="mini" data-redit="${r.id}">✎</button></div>`;
 }
 
 function renderRoutines() {
   const today = todayIso();
-  const tomorrow = L.addDaysIso(today, 1);
   const todayInst = L.routineInstancesForDate(App.state, today);
-  const tomInst = L.routineInstancesForDate(App.state, tomorrow);
-  const sleeping = L.sleepingRoutines(App.state);
-  // Rutiner som allerede vises over (I dag / For i morgen / Inaktive) – unngå duplikater.
-  const shown = new Set();
-  todayInst.forEach((i) => shown.add(i.routineId));
-  tomInst.forEach((i) => shown.add(i.routineId));
-  sleeping.forEach((r) => shown.add(r.id));
-  const others = App.state.settings.routines.filter((r) => !shown.has(r.id));
-  // Utførte rutiner legges litt bort fra «I dag»-lista, i en egen (lukket) seksjon.
   const activeToday = todayInst.filter((i) => !i.done);
   const doneToday = todayInst.filter((i) => i.done);
+  const inactive = L.inactiveRoutines(App.state, today);
+  // Fullførte legges bort i en egen (lukket) seksjon.
   let doneSec = '';
   if (doneToday.length) {
     const open = App.doneRtnOpen;
     doneSec = `<h2 class="collapse ${open ? 'open' : ''}" data-donertntoggle="1">`
-      + `✓ Fullført i dag (${doneToday.length}) <span class="caret">⌄</span></h2>`
+      + `✓ Fullførte (${doneToday.length}) <span class="caret">⌄</span></h2>`
       + (open ? doneToday.map(instCardHtml).join('') : '');
   }
   return headerBar('🔁 Rutiner')
     + `<div class="body">`
-    + `<p class="sub">Dine rutiner maser ikke – du henter dem når du vil.</p>`
-    + `<h2>I dag</h2>` + (activeToday.length ? activeToday.map(instCardHtml).join('') : `<p class="sub">Ingen aktive i dag.</p>`)
+    + `<p class="sub">Alle rutiner starter inaktive – aktiver dem du vil bruke i dag. Nullstilles hver dag.</p>`
+    + `<h2>Aktive</h2>` + (activeToday.length ? activeToday.map(instCardHtml).join('') : `<p class="sub">Ingen aktive rutiner. Aktiver en nedenfor.</p>`)
     + doneSec
-    + (tomInst.length ? `<h2>For i morgen 🌙</h2>` + tomInst.map(instCardHtml).join('') : '')
-    + `<h2>Inaktive</h2>` + (sleeping.length ? `<div class="card">${sleeping.map(sleepRowHtml).join('')}</div>` : `<p class="sub">Ingen inaktive rutiner.</p>`)
-    + (others.length ? `<h2>Andre rutiner</h2><div class="card">${others.map(tmplRowHtml).join('')}</div>` : '')
+    + `<h2>Inaktive</h2>` + (inactive.length ? `<div class="card">${inactive.map(inactiveRowHtml).join('')}</div>` : `<p class="sub">Alle rutiner er aktivert 🌱</p>`)
     + `<button class="btn" data-rnew="1">＋ Ny rutine</button>`
     + `</div>`;
 }
@@ -909,8 +889,6 @@ function openRoutineEditor(id) {
 
 function renderRoutineEditor() {
   const e = App.routineEdit;
-  const wdChips = WD.map(([k, l]) =>
-    `<span class="chip ${(e.weekdays || []).includes(k) ? 'on' : ''}" data-ewd="${k}">${l}</span>`).join('');
   const subRows = (e.subtasks || []).map((s, i) =>
     `<div class="trow subrow" data-row-id="${s.id}"><div class="row">`
     + `<span class="draghandle" data-draghandle="${s.id}" title="Dra for å flytte">⠿</span>`
@@ -920,11 +898,6 @@ function renderRoutineEditor() {
     + `<input class="inp" id="eTitle" placeholder="Rutinenavn (f.eks. Kveldssjekk)" value="${esc(e.title)}">`
     + `<div class="lab">Deloppgaver</div><div class="subdrop" data-droplist="subtasks">${subRows}</div>`
     + `<button class="btn ghost" id="eAddSub">＋ Deloppgave</button>`
-    + `<div class="lab">Ukedager</div><div class="wdrow">${wdChips}</div>`
-    + `<div class="lab">Valg</div><div class="chips">`
-    + `<span class="chip ${e.sleeping ? 'on' : ''}" data-etgl="sleeping">💤 Inaktiv (vekk ved behov)</span>`
-    + `<span class="chip ${e.leadDay ? 'on' : ''}" data-etgl="leadDay">🌙 Vis fra dagen før</span>`
-    + `<span class="chip ${e.enabled ? 'on' : ''}" data-etgl="enabled">På</span></div>`
     + `<button class="btn" id="eSave">${e.id ? 'Lagre endringer' : 'Lagre rutine'}</button>`
     + `<button class="btn ghost" id="eCancel">Avbryt</button>`
     + (e.id ? `<button class="btn ghost" id="eDelete">Slett rutine</button>` : '')
@@ -943,14 +916,6 @@ function bindRoutineEditor() {
   o.querySelectorAll('[data-edel]').forEach((el) =>
     el.onclick = () => { e.subtasks.splice(Number(el.dataset.edel), 1); renderRoutineEditor(); });
   o.querySelector('#eAddSub').onclick = () => { e.subtasks.push({ id: 't' + Date.now().toString(36), text: '' }); renderRoutineEditor(); };
-  o.querySelectorAll('[data-ewd]').forEach((el) => el.onclick = () => {
-    const k = el.dataset.ewd; e.weekdays = e.weekdays || [];
-    e.weekdays = e.weekdays.includes(k) ? e.weekdays.filter((x) => x !== k) : e.weekdays.concat([k]);
-    renderRoutineEditor();
-  });
-  o.querySelectorAll('[data-etgl]').forEach((el) => el.onclick = () => {
-    const k = el.dataset.etgl; e[k] = !e[k]; renderRoutineEditor();
-  });
   o.querySelector('#eCancel').onclick = () => { App.routineEdit = null; o.remove(); };
   o.querySelector('#eSave').onclick = saveRoutineEditor;
   const del = o.querySelector('#eDelete');

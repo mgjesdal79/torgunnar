@@ -1,5 +1,5 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, jobItems, reorderItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes } from '../js/logic.js';
-const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, taskItems, jobItems, reorderItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, deleteItem, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes };
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, jobItems, reorderItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, inactiveRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes } from '../js/logic.js';
+const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, inactiveRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, taskItems, jobItems, reorderItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, deleteItem, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes };
 
 export function runTests() {
   const results = [];
@@ -374,6 +374,22 @@ export function runTests() {
     s.routineInstances = [{ id: 'a', date: '2026-10-10' }, { id: 'b', date: '2026-10-16' }];
     const p = L.pruneRoutineInstances(s, '2026-10-16');
     eq(p.routineInstances.length, 1);
+  });
+  t('inactiveRoutines lister alle rutiner uten aktiv instans i dag', () => {
+    let s = L.addRoutine(L.defaultState(), { routine: { title: 'A' } }, { now: 'N', id: 'r1' });
+    s = L.addRoutine(s, { routine: { title: 'B' } }, { now: 'N', id: 'r2' });
+    eq(L.inactiveRoutines(s, '2026-10-16').length, 2);
+    s = L.wakeRoutine(s, { id: 'r1', date: '2026-10-16' }, { now: 'N2' });
+    const inact = L.inactiveRoutines(s, '2026-10-16');
+    eq(inact.length, 1);
+    eq(inact[0].id, 'r2');
+  });
+  t('inactiveRoutines teller bortlagt (skipped) som inaktiv igjen', () => {
+    let s = L.addRoutine(L.defaultState(), { routine: { title: 'A' } }, { now: 'N', id: 'r1' });
+    s = L.wakeRoutine(s, { id: 'r1', date: '2026-10-16' }, { now: 'N2' });
+    eq(L.inactiveRoutines(s, '2026-10-16').length, 0);
+    s = L.skipRoutineInstance(s, { instanceId: 'r1:2026-10-16' }, { now: 'N3' });
+    eq(L.inactiveRoutines(s, '2026-10-16').length, 1);
   });
 
   // ---- Rutiner: avkryssing ----
