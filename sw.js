@@ -1,4 +1,4 @@
-const VERSION = '36';
+const VERSION = '37';
 const CACHE = 'torgunnar-v' + VERSION;
 const SHELL = [
   './', './index.html', './manifest.json',
@@ -8,7 +8,13 @@ const SHELL = [
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())
+    // cache: 'reload' tvinger ferske henting (utenom HTTP-cachen), slik at hele
+    // skallet alltid cachses fra SAMME deploy. Uten dette kan install blande
+    // versjoner (f.eks. ny app.js + gammel logic.js hvis to deploys skjer tett),
+    // og da mangler app.js-handlere funksjoner i logic.js → klikk gjør ingenting.
+    caches.open(CACHE)
+      .then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: 'reload' }))))
+      .then(() => self.skipWaiting())
   );
 });
 
