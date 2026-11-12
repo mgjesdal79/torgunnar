@@ -54,6 +54,10 @@
   h2{font-size:18px;margin:14px 2px 8px}
   h2.todayhead{cursor:pointer}
   h2.todayhead::after{content:' ›';color:var(--faint)}
+  h2.collapse{cursor:pointer;color:var(--dim);display:flex;align-items:center;gap:6px;
+    -webkit-tap-highlight-color:transparent}
+  h2.collapse .caret{color:var(--faint);transition:transform .15s ease;display:inline-block}
+  h2.collapse.open .caret{transform:rotate(180deg)}
   .sub{color:var(--dim);font-size:13px;margin:0 2px 12px}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
     padding:2px 14px;margin-bottom:12px}
@@ -201,7 +205,7 @@
   window.SUPABASE_ANON_KEY = 'sb_publishable_iUwAfMrw1Ckrxbf1ZDLINA_xKUGyscg'; // publishable (public-safe)
 </script>
 <script type="module">
-  window.APP_VERSION = '27';
+  window.APP_VERSION = '28';
   window.APP_BUILD = '2026-11-12';
   const b = document.getElementById('build');
   if (b) b.textContent = 'build ' + window.APP_VERSION + ' · ' + window.APP_BUILD;
