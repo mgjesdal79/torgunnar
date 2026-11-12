@@ -257,6 +257,9 @@ function bind(root) {
 // slipp. Lista merkes med [data-droplist]="<kind>"; hver rad med [data-row-id].
 // «kind» avgjør hva slippet gjør (items → L.reorderItems; subtasks → lokal
 // rutine-editor-state). Legg til flere kinds i onDrop ved behov.
+// Dokument-baserte lyttere (ikke bare setPointerCapture på håndtaket): på touch
+// er håndtaket for lite til å holde peker-fokus, og captured pointermove er
+// upålitelig på iOS. Vi lytter på hele document mens en drag pågår.
 let drag = null;
 function bindDrag(root) {
   root.querySelectorAll('[data-draghandle]').forEach((handle) => {
@@ -268,16 +271,16 @@ function startDrag(ev, handle) {
   const list = handle.closest('[data-droplist]');
   if (!row || !list) return;
   ev.preventDefault();
+  ev.stopPropagation();
   drag = { row, list, moved: false };
   row.classList.add('dragging');
-  try { handle.setPointerCapture(ev.pointerId); } catch (e) {}
-  handle.onpointermove = onDragMove;
-  handle.onpointerup = endDrag;
-  handle.onpointercancel = endDrag;
+  document.addEventListener('pointermove', onDragMove, { passive: false });
+  document.addEventListener('pointerup', endDrag);
+  document.addEventListener('pointercancel', endDrag);
 }
 function onDragMove(ev) {
   if (!drag) return;
-  ev.preventDefault();
+  if (ev.cancelable) ev.preventDefault();
   drag.moved = true;
   const rows = [...drag.list.querySelectorAll('[data-row-id]')].filter((r) => r !== drag.row);
   const y = ev.clientY;
@@ -289,13 +292,13 @@ function onDragMove(ev) {
   if (before) drag.list.insertBefore(drag.row, before);
   else drag.list.appendChild(drag.row);
 }
-function endDrag(ev) {
+function endDrag() {
   if (!drag) return;
   const { list, row, moved } = drag;
   row.classList.remove('dragging');
-  const handle = ev.currentTarget;
-  try { handle.releasePointerCapture(ev.pointerId); } catch (e) {}
-  handle.onpointermove = handle.onpointerup = handle.onpointercancel = null;
+  document.removeEventListener('pointermove', onDragMove);
+  document.removeEventListener('pointerup', endDrag);
+  document.removeEventListener('pointercancel', endDrag);
   drag = null;
   if (!moved) return;
   const kind = list.dataset.droplist;
