@@ -12,6 +12,7 @@ const App = {
   impAddOpen: false, impOpen: {}, impDepth: {},
   rowOpen: {},
   doneRtnOpen: false,
+  konaTrashOpen: false,
 };
 
 function ctx() { return { now: nowIso(), id: newId() }; }
@@ -213,6 +214,12 @@ function bind(root) {
     el.onclick = () => commit(L.snoozeNudge(App.state, { id: el.dataset.msnooze }, ctx())));
   root.querySelectorAll('[data-kdismiss]').forEach((el) =>
     el.onclick = () => commit(L.deleteItem(App.state, { id: el.dataset.kdismiss }, ctx())));
+  root.querySelectorAll('[data-konatrashtoggle]').forEach((el) =>
+    el.onclick = () => { App.konaTrashOpen = !App.konaTrashOpen; render(); });
+  root.querySelectorAll('[data-krestore]').forEach((el) =>
+    el.onclick = () => commit(L.restoreItem(App.state, { id: el.dataset.krestore }, ctx())));
+  root.querySelectorAll('[data-kpurge]').forEach((el) =>
+    el.onclick = () => { if (confirm('Slette denne lappen for godt?')) commit(L.purgeItem(App.state, { id: el.dataset.kpurge }, ctx())); });
   root.querySelectorAll('[data-settime]').forEach((el) =>
     el.onclick = () => openTime(el.dataset.settime));
   root.querySelectorAll('[data-tstep]').forEach((el) =>
@@ -835,17 +842,31 @@ function konaRowHtml(it) {
     + `<button class="mini" data-kdismiss="${it.id}">✕</button></div>`;
 }
 
+function konaTrashRowHtml(it) {
+  return `<div class="row"><div class="rtxt done"><div class="t">${esc(it.text)}</div></div>`
+    + `<button class="mini" data-krestore="${it.id}">↩ Gjenopprett</button>`
+    + `<button class="mini danger" data-kpurge="${it.id}">Slett for godt</button></div>`;
+}
+
 function renderKona() {
   const items = L.konaItems(App.state);
   const list = items.length
     ? `<div class="card">${items.map(konaRowHtml).join('')}</div>`
     : `<p class="sub">Ingen lapper fra Ingrid akkurat nå 🌱</p>`;
+  const trash = L.konaTrashItems(App.state);
+  let trashSec = '';
+  if (trash.length) {
+    const open = App.konaTrashOpen;
+    trashSec = `<h2 class="collapse ${open ? 'open' : ''}" data-konatrashtoggle="1">`
+      + `🗑 Slettet (${trash.length}) <span class="caret">⌄</span></h2>`
+      + (open ? `<div class="card">${trash.map(konaTrashRowHtml).join('')}</div>` : '');
+  }
   return headerBar('💬 Ingrid')
     + `<div class="body">`
     + `<p class="sub">Ingrid legger igjen en beskjed til Tor Gunnar. Han triagerer dem selv.</p>`
     + `<div class="konacap"><input class="inp" id="konaText" placeholder="Skriv en lapp…">`
     + `<button class="btn" id="konaAdd">Legg til</button></div>`
-    + list + `</div>`;
+    + list + trashSec + `</div>`;
 }
 
 
