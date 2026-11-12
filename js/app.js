@@ -171,10 +171,6 @@ function bind(root) {
     el.onclick = () => openImprovementEdit(el.dataset.impedit));
   root.querySelectorAll('[data-impexpand]').forEach((el) =>
     el.onclick = () => { const id = el.dataset.impexpand; App.impOpen[id] = !App.impOpen[id]; render(); });
-  root.querySelectorAll('[data-impup]').forEach((el) =>
-    el.onclick = () => commit(L.reorderImprovement(App.state, { id: el.dataset.impup, dir: 'up' }, ctx())));
-  root.querySelectorAll('[data-impdown]').forEach((el) =>
-    el.onclick = () => commit(L.reorderImprovement(App.state, { id: el.dataset.impdown, dir: 'down' }, ctx())));
   const ieTitle = root.querySelector('#impEditTitle');
   if (ieTitle) ieTitle.oninput = () => { App.impEdit.text = ieTitle.value; };
   const ieBody = root.querySelector('#impEditBody');
@@ -255,10 +251,12 @@ function bind(root) {
   }
 }
 
-// --- Dra-og-slipp for gjøremåls-/jobblista ---------------------------------
+// --- Dra-og-slipp (generisk) ------------------------------------------------
 // Pointer-basert (fungerer på touch der native HTML5-drag er upålitelig). Vi
 // flytter raden i DOM-en live mens man drar, og skriver ny rekkefølge først ved
-// slipp (leser id-ene slik de ligger, kaller L.reorderItems).
+// slipp. Lista merkes med [data-droplist]="<kind>"; hver rad med [data-row-id].
+// «kind» avgjør hva slippet gjør (items → L.reorderItems; subtasks → lokal
+// rutine-editor-state). Legg til flere kinds i onDrop ved behov.
 let drag = null;
 function bindDrag(root) {
   root.querySelectorAll('[data-draghandle]').forEach((handle) => {
@@ -266,12 +264,12 @@ function bindDrag(root) {
   });
 }
 function startDrag(ev, handle) {
-  const trow = handle.closest('.trow');
-  const list = handle.closest('.droplist');
-  if (!trow || !list) return;
+  const row = handle.closest('[data-row-id]');
+  const list = handle.closest('[data-droplist]');
+  if (!row || !list) return;
   ev.preventDefault();
-  drag = { trow, list, moved: false };
-  trow.classList.add('dragging');
+  drag = { row, list, moved: false };
+  row.classList.add('dragging');
   try { handle.setPointerCapture(ev.pointerId); } catch (e) {}
   handle.onpointermove = onDragMove;
   handle.onpointerup = endDrag;
@@ -281,26 +279,40 @@ function onDragMove(ev) {
   if (!drag) return;
   ev.preventDefault();
   drag.moved = true;
-  const rows = [...drag.list.querySelectorAll('.trow:not(.dragging)')];
+  const rows = [...drag.list.querySelectorAll('[data-row-id]')].filter((r) => r !== drag.row);
   const y = ev.clientY;
   let before = null;
   for (const r of rows) {
     const box = r.getBoundingClientRect();
     if (y < box.top + box.height / 2) { before = r; break; }
   }
-  if (before) drag.list.insertBefore(drag.trow, before);
-  else drag.list.appendChild(drag.trow);
+  if (before) drag.list.insertBefore(drag.row, before);
+  else drag.list.appendChild(drag.row);
 }
 function endDrag(ev) {
   if (!drag) return;
-  const { list, trow, moved } = drag;
-  trow.classList.remove('dragging');
+  const { list, row, moved } = drag;
+  row.classList.remove('dragging');
   const handle = ev.currentTarget;
   try { handle.releasePointerCapture(ev.pointerId); } catch (e) {}
   handle.onpointermove = handle.onpointerup = handle.onpointercancel = null;
   drag = null;
   if (!moved) return;
-  const orderedIds = [...list.querySelectorAll('.trow')].map((r) => r.dataset.rowId);
+  const kind = list.dataset.droplist;
+  const orderedIds = [...list.querySelectorAll('[data-row-id]')].map((r) => r.dataset.rowId);
+  onDrop(kind, orderedIds);
+}
+function onDrop(kind, orderedIds) {
+  if (kind === 'subtasks') {
+    // Rutine-editorens deloppgaver ligger i flyktig App.routineEdit.subtasks.
+    if (!App.routineEdit) return;
+    const byId = {};
+    (App.routineEdit.subtasks || []).forEach((s) => { byId[s.id] = s; });
+    App.routineEdit.subtasks = orderedIds.map((id) => byId[id]).filter(Boolean);
+    renderRoutineEditor();
+    return;
+  }
+  // Standard: ekte items med order-felt (gjøremål/jobb/langsiktig/forbedring).
   commit(L.reorderItems(App.state, { orderedIds }, ctx()));
 }
 
@@ -521,7 +533,7 @@ function taskRowHtml(it) {
 // Hele gjøremåls-/jobblista i ett felt (ingen ramme per rad) som også er drop-sone
 // for dra-og-slipp. Tomme lister rendres av kalleren.
 function taskListCard(items) {
-  return `<div class="card droplist">${items.map(taskRowHtml).join('')}</div>`;
+  return `<div class="card droplist" data-droplist="items">${items.map(taskRowHtml).join('')}</div>`;
 }
 
 function renderTasks() {
@@ -633,9 +645,9 @@ function improvementEditForm() {
     + `<button class="mini danger" id="impEditDelete">Slett</button></div>`;
 }
 
-function improvementCardHtml(it, isFirst, isLast) {
+function improvementCardHtml(it) {
   if (App.impEdit && App.impEdit.id === it.id) {
-    return `<div class="card improvement">${improvementEditForm()}</div>`;
+    return `<div class="card improvement" data-row-id="${it.id}">${improvementEditForm()}</div>`;
   }
   const bodyHtml = it.body ? `<div class="mdbody">${L.renderMarkdown(it.body)}</div>` : '';
   const open = !!App.impOpen[it.id];
@@ -644,11 +656,10 @@ function improvementCardHtml(it, isFirst, isLast) {
     : '';
   const depthHtml = (it.depth && open)
     ? `<div class="mddepth">${L.renderMarkdown(it.depth)}</div>` : '';
-  const upBtn = isFirst ? '' : `<button class="mini ord" data-impup="${it.id}" title="Flytt opp">▲</button>`;
-  const downBtn = isLast ? '' : `<button class="mini ord" data-impdown="${it.id}" title="Flytt ned">▼</button>`;
-  return `<div class="card improvement">`
-    + `<div class="imphead"><div class="t">${esc(it.text)}</div>`
-    + `<div class="impacts">${upBtn}${downBtn}`
+  const handle = `<span class="draghandle" data-draghandle="${it.id}" title="Dra for å flytte">⠿</span>`;
+  return `<div class="card improvement" data-row-id="${it.id}">`
+    + `<div class="imphead">${handle}<div class="t">${esc(it.text)}</div>`
+    + `<div class="impacts">`
     + `<button class="mini" data-impedit="${it.id}">Rediger</button></div></div>`
     + bodyHtml
     + depthToggle
@@ -659,7 +670,7 @@ function improvementCardHtml(it, isFirst, isLast) {
 function renderImprovements() {
   const items = L.improvementItems(App.state);
   const body = items.length
-    ? items.map((it, i) => improvementCardHtml(it, i === 0, i === items.length - 1)).join('')
+    ? `<div data-droplist="items">${items.map(improvementCardHtml).join('')}</div>`
     : `<p class="sub">Ingenting her ennå 🌱 Legg til noe du vil ta vare på eller jobbe med.</p>`;
   return headerBar('🌱 Forbedring')
     + `<div class="body">`
@@ -750,7 +761,7 @@ function daysUntil(iso) {
 }
 
 function mediumRowHtml(it) {
-  if (isEditing(it.id)) return editForm();
+  if (isEditing(it.id)) return `<div class="trow editing" data-row-id="${it.id}">${editForm()}</div>`;
   const now = nowIso();
   const chk = `<span class="chk ${it.done ? 'on' : ''}" data-done="${it.id}"></span>`;
   const meta = [];
@@ -758,11 +769,12 @@ function mediumRowHtml(it) {
     if (it.resurfaceAt && it.resurfaceAt <= now) meta.push('👋 klar nå');
     else if (it.resurfaceAt) meta.push('👋 om ' + daysUntil(it.resurfaceAt) + ' d');
   }
-  return `<div class="row">${chk}`
+  const handle = `<span class="draghandle" data-draghandle="${it.id}" title="Dra for å flytte">⠿</span>`;
+  return `<div class="trow" data-row-id="${it.id}"><div class="row">${handle}${chk}`
     + `<div class="rtxt" data-edit="${it.id}"><div class="t">${esc(it.text)}</div>`
     + (meta.length ? `<div class="m">${esc(meta.join(' · '))}</div>` : '')
     + `</div>`
-    + `<button class="mini" data-promote="${it.id}">I dag</button></div>`;
+    + `<button class="mini" data-promote="${it.id}">I dag</button></div></div>`;
 }
 
 function renderMedium() {
@@ -771,7 +783,7 @@ function renderMedium() {
   let body = '';
   groups.forEach(([key, label]) => {
     const g = items.filter((i) => (i.insistence || 'chill') === key);
-    if (g.length) body += `<h2>${label}</h2><div class="card">${g.map(mediumRowHtml).join('')}</div>`;
+    if (g.length) body += `<h2>${label}</h2><div class="card droplist" data-droplist="items">${g.map(mediumRowHtml).join('')}</div>`;
   });
   if (!body) body = `<p class="sub">Ingenting her ennå. Fang noe som «💛 Langsiktig».</p>`;
   return headerBar('💛 Langsiktig')
@@ -877,13 +889,13 @@ function renderRoutineEditor() {
   const wdChips = WD.map(([k, l]) =>
     `<span class="chip ${(e.weekdays || []).includes(k) ? 'on' : ''}" data-ewd="${k}">${l}</span>`).join('');
   const subRows = (e.subtasks || []).map((s, i) =>
-    `<div class="row"><input class="inp" style="margin:0" data-esub="${i}" value="${esc(s.text)}" placeholder="Deloppgave…">`
-    + `<button class="mini" data-eup="${i}">↑</button>`
-    + `<button class="mini" data-edown="${i}">↓</button>`
-    + `<button class="mini" data-edel="${i}">✕</button></div>`).join('');
+    `<div class="trow subrow" data-row-id="${s.id}"><div class="row">`
+    + `<span class="draghandle" data-draghandle="${s.id}" title="Dra for å flytte">⠿</span>`
+    + `<input class="inp" style="margin:0" data-esub="${i}" value="${esc(s.text)}" placeholder="Deloppgave…">`
+    + `<button class="mini" data-edel="${i}">✕</button></div></div>`).join('');
   const html = `<div class="overlay" id="ov"><div class="sheet">`
     + `<input class="inp" id="eTitle" placeholder="Rutinenavn (f.eks. Kveldssjekk)" value="${esc(e.title)}">`
-    + `<div class="lab">Deloppgaver</div>${subRows}`
+    + `<div class="lab">Deloppgaver</div><div class="subdrop" data-droplist="subtasks">${subRows}</div>`
     + `<button class="btn ghost" id="eAddSub">＋ Deloppgave</button>`
     + `<div class="lab">Ukedager</div><div class="wdrow">${wdChips}</div>`
     + `<div class="lab">Valg</div><div class="chips">`
@@ -907,10 +919,6 @@ function bindRoutineEditor() {
     el.oninput = () => { e.subtasks[Number(el.dataset.esub)].text = el.value; });
   o.querySelectorAll('[data-edel]').forEach((el) =>
     el.onclick = () => { e.subtasks.splice(Number(el.dataset.edel), 1); renderRoutineEditor(); });
-  o.querySelectorAll('[data-eup]').forEach((el) =>
-    el.onclick = () => { const i = Number(el.dataset.eup); if (i > 0) { const a = e.subtasks; [a[i - 1], a[i]] = [a[i], a[i - 1]]; renderRoutineEditor(); } });
-  o.querySelectorAll('[data-edown]').forEach((el) =>
-    el.onclick = () => { const i = Number(el.dataset.edown); const a = e.subtasks; if (i < a.length - 1) { [a[i + 1], a[i]] = [a[i], a[i + 1]]; renderRoutineEditor(); } });
   o.querySelector('#eAddSub').onclick = () => { e.subtasks.push({ id: 't' + Date.now().toString(36), text: '' }); renderRoutineEditor(); };
   o.querySelectorAll('[data-ewd]').forEach((el) => el.onclick = () => {
     const k = el.dataset.ewd; e.weekdays = e.weekdays || [];
@@ -927,6 +935,7 @@ function bindRoutineEditor() {
     const id = e.id; App.routineEdit = null; o.remove();
     commit(L.deleteRoutine(App.state, { id }, ctx()));
   };
+  bindDrag(o);
 }
 
 function saveRoutineEditor() {

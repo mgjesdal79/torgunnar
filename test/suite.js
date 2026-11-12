@@ -479,6 +479,28 @@ export function runTests() {
     s = completeItem(s, { id: 'm1' }, { now: 'N' });
     eq(L.mediumItems(s).length, 0);
   });
+  t('mediumItems: manuell order styrer innen samme mase-gruppe', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'A', type: 'someday' }, { now: '2026-10-16T08:00:00.000Z', id: 'a' });
+    s = addItem(s, { text: 'B', type: 'someday' }, { now: '2026-10-16T08:00:01.000Z', id: 'b' });
+    s = addItem(s, { text: 'C', type: 'someday' }, { now: '2026-10-16T08:00:02.000Z', id: 'c' });
+    // alle chill (default) → uten order: nyeste først
+    eq(L.mediumItems(s).map((i) => i.id), ['c', 'b', 'a']);
+    // dra a øverst
+    s = L.reorderItems(s, { orderedIds: ['a', 'c', 'b'] }, { now: 'N' });
+    eq(L.mediumItems(s).map((i) => i.id), ['a', 'c', 'b']);
+  });
+  t('migrate backfiller order på langsiktig (someday)', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'A', type: 'someday' }, { now: '2026-10-16T08:00:00.000Z', id: 'a' });
+    s = addItem(s, { text: 'B', type: 'someday' }, { now: '2026-10-16T08:00:01.000Z', id: 'b' });
+    s.items.forEach((i) => { delete i.order; });
+    const m = migrate(s);
+    const ao = m.items.find((i) => i.id === 'a').order;
+    const bo = m.items.find((i) => i.id === 'b').order;
+    // nyeste (B) får lavest order → øverst, som før
+    if (!(bo < ao)) throw new Error('forventet B over A etter backfill');
+  });
   t('mediumBadge teller kun nag', () => {
     let s = defaultState();
     s = addItem(s, { text: 'A', type: 'someday' }, { now: '2026-10-16T08:00:00.000Z', id: 'a' });
