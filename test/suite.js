@@ -1,5 +1,5 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, jobItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes } from '../js/logic.js';
-const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, taskItems, jobItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, deleteItem, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes };
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, jobItems, reorderItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes } from '../js/logic.js';
+const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumBadge, improvementItems, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, taskItems, jobItems, reorderItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, deleteItem, trashItems, restoreItem, purgeItem, purgeAllTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes };
 
 export function runTests() {
   const results = [];
@@ -703,16 +703,51 @@ export function runTests() {
   });
 
   // === Gjøremål / tid / Påminnelser (build 7) ===
-  t('taskItems: åpne gjøremål, timede først (tid stigende) så nyeste', () => {
+  t('taskItems: uten manuell order ligger nyeste øverst (tid flytter ikke lenger raden)', () => {
     const now = '2026-10-16T08:00:00.000Z';
     let s = defaultState();
-    s = addItem(s, { text: 'u-eldst', type: 'task' }, { now: '2026-10-16T07:00:00.000Z', id: 'a' });
-    s = addItem(s, { text: 'u-nyest', type: 'task' }, { now: '2026-10-16T07:30:00.000Z', id: 'b' });
-    s = addItem(s, { text: 'timed-sen', type: 'task' }, { now, id: 'c' });
-    s = L.scheduleTask(s, { id: 'c', at: '2026-10-16T20:00:00.000Z' }, { now });
-    s = addItem(s, { text: 'timed-tidlig', type: 'task' }, { now, id: 'd' });
-    s = L.scheduleTask(s, { id: 'd', at: '2026-10-16T09:00:00.000Z' }, { now });
-    eq(L.taskItems(s, now).map((i) => i.id), ['d', 'c', 'b', 'a']);
+    s = addItem(s, { text: 'eldst', type: 'task' }, { now: '2026-10-16T07:00:00.000Z', id: 'a' });
+    s = addItem(s, { text: 'midt', type: 'task' }, { now: '2026-10-16T07:30:00.000Z', id: 'b' });
+    s = addItem(s, { text: 'nyest', type: 'task' }, { now, id: 'c' });
+    // En gammel rad får et klokkeslett – den skal likevel bli liggende (manuell styring vinner).
+    s = L.scheduleTask(s, { id: 'a', at: '2026-10-16T09:00:00.000Z' }, { now });
+    eq(L.taskItems(s, now).map((i) => i.id), ['c', 'b', 'a']);
+  });
+  t('taskItems: manuell order (dra-og-slipp) styrer rekkefølgen', () => {
+    const now = '2026-10-16T08:00:00.000Z';
+    let s = defaultState();
+    s = addItem(s, { text: 'a', type: 'task' }, { now, id: 'a' });
+    s = addItem(s, { text: 'b', type: 'task' }, { now, id: 'b' });
+    s = addItem(s, { text: 'c', type: 'task' }, { now, id: 'c' });
+    s = L.reorderItems(s, { orderedIds: ['c', 'a', 'b'] }, { now });
+    eq(L.taskItems(s, now).map((i) => i.id), ['c', 'a', 'b']);
+  });
+  t('reorderItems: bare items som faktisk flyttet får ny updatedAt', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'a', type: 'task' }, { now: '2026-10-16T07:00:00.000Z', id: 'a' });
+    s = addItem(s, { text: 'b', type: 'task' }, { now: '2026-10-16T07:00:00.000Z', id: 'b' });
+    s = addItem(s, { text: 'c', type: 'task' }, { now: '2026-10-16T07:00:00.000Z', id: 'c' });
+    s = L.reorderItems(s, { orderedIds: ['a', 'b', 'c'] }, { now: '2026-10-16T08:00:00.000Z' });
+    // a blir liggende på index 0 → skal IKKE få ny updatedAt; b og c bytter plass.
+    s = L.reorderItems(s, { orderedIds: ['a', 'c', 'b'] }, { now: '2026-10-16T09:00:00.000Z' });
+    const get = (id) => s.items.find((i) => i.id === id);
+    eq([get('a').order, get('c').order, get('b').order], [0, 1, 2]);
+    eq(get('a').updatedAt, '2026-10-16T08:00:00.000Z'); // uendret
+    eq(get('c').updatedAt, '2026-10-16T09:00:00.000Z');
+    eq(get('b').updatedAt, '2026-10-16T09:00:00.000Z');
+  });
+  t('migrate backfiller order på gjøremål (timede først, så nyeste) ved første oppgradering', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'eldst', type: 'task' }, { now: '2026-10-16T07:00:00.000Z', id: 'a' });
+    s = addItem(s, { text: 'nyest', type: 'task' }, { now: '2026-10-16T07:30:00.000Z', id: 'b' });
+    s = addItem(s, { text: 'timed', type: 'task' }, { now: '2026-10-16T07:10:00.000Z', id: 'c' });
+    s = L.scheduleTask(s, { id: 'c', at: '2026-10-16T09:00:00.000Z' }, { now: '2026-10-16T08:00:00.000Z' });
+    // Nullstill order for å simulere data laget før feltet fantes.
+    s.items.forEach((i) => { i.order = null; });
+    s = migrate(s, '2026-10-16');
+    const byId = (id) => s.items.find((i) => i.id === id).order;
+    // c (timed) øverst, så b (nyest), så a (eldst)
+    eq([byId('c'), byId('b'), byId('a')], [0, 1, 2]);
   });
   t('taskItems utelater done, note, someday og gjemte', () => {
     const now = '2026-10-16T10:00:00.000Z';
@@ -726,7 +761,7 @@ export function runTests() {
     s = addItem(s, { text: 'åpen', type: 'task' }, { now, id: 'e' });
     eq(L.taskItems(s, now).map((i) => i.id), ['e']);
   });
-  t('jobItems: kun åpne jobb-gjøremål, timede først så nyeste', () => {
+  t('jobItems: kun åpne jobb-gjøremål, nyeste øverst uten manuell order', () => {
     const now = '2026-10-16T08:00:00.000Z';
     let s = defaultState();
     s = addItem(s, { text: 'jobb-eldst', type: 'job' }, { now: '2026-10-16T07:00:00.000Z', id: 'a' });

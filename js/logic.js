@@ -40,6 +40,21 @@ export function migrate(state, today) {
     imps.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
     imps.forEach((it, i) => { it.order = i; });
   }
+  // Manuell dra-og-slipp-rekkefølge på gjøremål/jobb: backfill order når feltet
+  // mangler. Reproduser den gamle sorteringen (timede først, så nyeste) slik at
+  // lista ser identisk ut ved første oppgradering – deretter er den manuell.
+  ['task', 'job'].forEach((tp) => {
+    const list = out.items.filter((i) => i.type === tp && !i.removed);
+    if (list.length && list.every((i) => i.order == null)) {
+      list.sort((a, b) => {
+        if (a.remindAt && b.remindAt) return a.remindAt.localeCompare(b.remindAt);
+        if (a.remindAt) return -1;
+        if (b.remindAt) return 1;
+        return (b.createdAt || '').localeCompare(a.createdAt || '');
+      });
+      list.forEach((it, i) => { it.order = i; });
+    }
+  });
   return out;
 }
 
@@ -254,26 +269,41 @@ export function somedayItems(state) {
 }
 
 // Åpne gjøremål. Timede (remindAt) først, stigende på tid; resten nyeste først.
+// Manuell rekkefølge (dra-og-slipp) styrer lista: lavest order øverst. Items uten
+// order (nylig fanget, ennå ikke dratt) legger seg øverst, nyeste først – slik at
+// noe du nettopp la til dukker opp på toppen til du eventuelt drar det på plass.
+function byManualOrder(a, b) {
+  const ao = a.order, bo = b.order;
+  if (ao == null && bo == null) return (b.createdAt || '').localeCompare(a.createdAt || '');
+  if (ao == null) return -1;
+  if (bo == null) return 1;
+  if (ao !== bo) return ao - bo;
+  return (b.createdAt || '').localeCompare(a.createdAt || '');
+}
+
 export function taskItems(state, now) {
   return activeItems(state)
     .filter((i) => i.type === 'task' && !i.done && isResurfaced(i, now))
-    .sort((a, b) => {
-      if (a.remindAt && b.remindAt) return a.remindAt.localeCompare(b.remindAt);
-      if (a.remindAt) return -1;
-      if (b.remindAt) return 1;
-      return (b.createdAt || '').localeCompare(a.createdAt || '');
-    });
+    .sort(byManualOrder);
 }
 
 export function jobItems(state, now) {
   return activeItems(state)
     .filter((i) => i.type === 'job' && !i.done && isResurfaced(i, now))
-    .sort((a, b) => {
-      if (a.remindAt && b.remindAt) return a.remindAt.localeCompare(b.remindAt);
-      if (a.remindAt) return -1;
-      if (b.remindAt) return 1;
-      return (b.createdAt || '').localeCompare(a.createdAt || '');
-    });
+    .sort(byManualOrder);
+}
+
+// Sett ny rekkefølge fra en liste av id-er (slik de ligger etter dra-og-slipp).
+// Bare items som faktisk flyttet får ny updatedAt → minst mulig synk-støy (LWW).
+export function reorderItems(state, { orderedIds }, ctx) {
+  const out = clone(state);
+  const byId = {};
+  out.items.forEach((i) => { byId[i.id] = i; });
+  (orderedIds || []).forEach((id, idx) => {
+    const it = byId[id];
+    if (it && it.order !== idx) { it.order = idx; it.updatedAt = ctx.now; }
+  });
+  return out;
 }
 
 // Utsatte jobber (deferred, ennå ikke tilbake). Jobb holdes utenfor «I dag»,
