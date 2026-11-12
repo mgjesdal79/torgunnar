@@ -220,6 +220,11 @@ function bind(root) {
     el.onclick = () => commit(L.restoreItem(App.state, { id: el.dataset.krestore }, ctx())));
   root.querySelectorAll('[data-kpurge]').forEach((el) =>
     el.onclick = () => { if (confirm('Slette denne lappen for godt?')) commit(L.purgeItem(App.state, { id: el.dataset.kpurge }, ctx())); });
+  root.querySelectorAll('[data-kpurgeall]').forEach((el) =>
+    el.onclick = () => {
+      const n = L.konaTrashItems(App.state).length;
+      if (confirm('Slette alle ' + n + ' lappene i Slettet for godt? Dette kan ikke angres.')) commit(L.purgeAllKonaTrash(App.state, ctx()));
+    });
   root.querySelectorAll('[data-settime]').forEach((el) =>
     el.onclick = () => openTime(el.dataset.settime));
   root.querySelectorAll('[data-tstep]').forEach((el) =>
@@ -859,7 +864,8 @@ function renderKona() {
     const open = App.konaTrashOpen;
     trashSec = `<h2 class="collapse ${open ? 'open' : ''}" data-konatrashtoggle="1">`
       + `🗑 Slettet (${trash.length}) <span class="caret">⌄</span></h2>`
-      + (open ? `<div class="card">${trash.map(konaTrashRowHtml).join('')}</div>` : '');
+      + (open ? `<div class="card">${trash.map(konaTrashRowHtml).join('')}</div>`
+          + `<button class="btn ghost" data-kpurgeall="1">Slett alle (${trash.length})</button>` : '');
   }
   return headerBar('💬 Ingrid')
     + `<div class="body">`

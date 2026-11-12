@@ -182,6 +182,15 @@ export function purgeAllTrash(state, ctx) {
   return out;
 }
 
+// Tømmer Ingrids egen «Slettet»-liste (alle slettede kona-lapper → tombstone).
+export function purgeAllKonaTrash(state, ctx) {
+  let out = state;
+  for (const it of konaTrashItems(state)) {
+    out = purgeItem(out, { id: it.id }, ctx);
+  }
+  return out;
+}
+
 // (Valgfri) rydder søppelkassa automatisk etter `days` dager. Kjøres IKKE
 // automatisk nå – Martin tømmer manuelt via badge-nudge. Beholdt om vi vil
 // slå den på senere. Udaterte gamle slettinger får removedAt ved kjøring.
