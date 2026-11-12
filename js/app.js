@@ -8,7 +8,7 @@ const App = {
   capFixed: null, capStay: false,
   edit: null,
   timeEdit: null,
-  imp: { text: '', body: '', depth: '' }, impEdit: null,
+  imp: { text: '', body: '', depth: '', category: '' }, impEdit: null,
   impAddOpen: false, impOpen: {}, impDepth: {},
   rowOpen: {},
   doneRtnOpen: false,
@@ -34,11 +34,12 @@ function quoteHtml() {
     + `🌿 <span class="qt">${esc(q)}</span> <span class="qrot">🔄</span></div>`;
 }
 
-function tileHtml(icon, label, badge, data) {
+function tileHtml(icon, label, badge, data, sub) {
   const b = badge && badge.count
     ? `<span class="badge ${badge.level}">${badge.count}</span>` : '';
+  const s = sub ? `<span class="subcount">${esc(sub)}</span>` : '';
   return `<div class="tile" ${data}>${b}<span class="ic">${icon}</span>`
-    + `<span class="lb">${esc(label)}</span></div>`;
+    + `<span class="lb">${esc(label)}</span>${s}</div>`;
 }
 
 function renderHome() {
@@ -58,7 +59,7 @@ function renderHome() {
     + tileHtml('💬', 'Ingrid', konaN, 'data-view="kona"')
     + tileHtml('🔁', 'Rutiner', null, 'data-view="routines"')
     + tileHtml('⚙️', 'Innstillinger', null, 'data-view="settings"')
-    + tileHtml('🗑', 'Søppelkasse', { count: trashN, level: trashN ? 'open' : 'calm' }, 'data-view="trash"');
+    + tileHtml('🗑', 'Søppelkasse', null, 'data-view="trash"', trashN ? String(trashN) : '');
   const todaySection = `<h2 class="todayhead" data-view="today">📌 I dag</h2>`
     + (todayItems.length
         ? listCard(todayItems)
@@ -163,6 +164,8 @@ function bind(root) {
   if (impBody) impBody.oninput = () => { App.imp.body = impBody.value; };
   const impDepth = root.querySelector('#impDepth');
   if (impDepth) impDepth.oninput = () => { App.imp.depth = impDepth.value; };
+  const impCat = root.querySelector('#impCat');
+  if (impCat) impCat.oninput = () => { App.imp.category = impCat.value; };
   const impAdd = root.querySelector('#impAddBtn');
   if (impAdd) impAdd.onclick = submitImprovement;
   const impAddToggle = root.querySelector('[data-impaddtoggle]');
@@ -179,6 +182,8 @@ function bind(root) {
   if (ieBody) ieBody.oninput = () => { App.impEdit.body = ieBody.value; };
   const ieDepth = root.querySelector('#impEditDepth');
   if (ieDepth) ieDepth.oninput = () => { App.impEdit.depth = ieDepth.value; };
+  const ieCat = root.querySelector('#impEditCat');
+  if (ieCat) ieCat.oninput = () => { App.impEdit.category = ieCat.value; };
   const ieSave = root.querySelector('#impEditSave');
   if (ieSave) ieSave.onclick = saveImprovementEdit;
   const ieCancel = root.querySelector('#impEditCancel');
@@ -628,13 +633,20 @@ function renderNotes() {
 }
 
 // --- Forbedring (🌱): overskrift + lengre Markdown-beskrivelse, ingen avkryssing ---
+function categoryDatalist(id) {
+  const opts = L.improvementCategories(App.state).map((c) => `<option value="${esc(c)}">`).join('');
+  return `<datalist id="${id}">${opts}</datalist>`;
+}
+
 function improvementAddBlock() {
   if (!App.impAddOpen) {
     return `<button class="addmini" data-impaddtoggle>＋ Ny forbedring</button>`;
   }
-  const i = App.imp || { text: '', body: '', depth: '' };
+  const i = App.imp || { text: '', body: '', depth: '', category: '' };
   return `<div class="capture card">`
     + `<input class="inp" id="impTitle" placeholder="Overskrift…" value="${esc(i.text)}">`
+    + `<input class="inp" id="impCat" list="impCatList" placeholder="Kategori (valgfritt) – f.eks. Oppgaver, Egenpleie…" value="${esc(i.category || '')}">`
+    + categoryDatalist('impCatList')
     + `<textarea class="inp" id="impBody" rows="5" placeholder="Beskrivelse – Markdown: **fet**, ## overskrift, - punkt…">${esc(i.body)}</textarea>`
     + `<textarea class="inp" id="impDepth" rows="4" placeholder="Dybde (valgfritt) – dyptgående påfyll, samme Markdown…">${esc(i.depth)}</textarea>`
     + `<div class="editacts"><button class="btn" id="impAddBtn">Legg til</button>`
@@ -645,6 +657,8 @@ function improvementAddBlock() {
 function improvementEditForm() {
   const e = App.impEdit;
   return `<input class="inp" id="impEditTitle" placeholder="Overskrift…" value="${esc(e.text)}">`
+    + `<input class="inp" id="impEditCat" list="impEditCatList" placeholder="Kategori (valgfritt)…" value="${esc(e.category || '')}">`
+    + categoryDatalist('impEditCatList')
     + `<textarea class="inp" id="impEditBody" rows="7" placeholder="Beskrivelse…">${esc(e.body)}</textarea>`
     + `<textarea class="inp" id="impEditDepth" rows="5" placeholder="Dybde (valgfritt) – dyptgående påfyll…">${esc(e.depth)}</textarea>`
     + `<div class="editacts"><button class="btn" id="impEditSave">Lagre</button>`
@@ -679,10 +693,17 @@ function improvementCardHtml(it) {
 }
 
 function renderImprovements() {
-  const items = L.improvementItems(App.state);
-  const body = items.length
-    ? `<div data-droplist="items">${items.map(improvementCardHtml).join('')}</div>`
-    : `<p class="sub">Ingenting her ennå 🌱 Legg til noe du vil ta vare på eller jobbe med.</p>`;
+  const groups = L.improvementGroups(App.state);
+  let body;
+  if (!groups.length) {
+    body = `<p class="sub">Ingenting her ennå 🌱 Legg til noe du vil ta vare på eller jobbe med.</p>`;
+  } else {
+    // Hver kategori får en synlig overskrift og sin egen drop-sone (dra innen gruppe).
+    body = groups.map((g) => {
+      const head = `<h2 class="impcat">${g.category ? esc(g.category) : 'Uten kategori'}</h2>`;
+      return head + `<div data-droplist="items">${g.items.map(improvementCardHtml).join('')}</div>`;
+    }).join('');
+  }
   return headerBar('🌱 Forbedring')
     + `<div class="body">`
     + improvementAddBlock()
@@ -693,10 +714,11 @@ function submitImprovement() {
   const t = (App.imp.text || '').trim();
   const b = (App.imp.body || '').trim();
   const d = (App.imp.depth || '').trim();
+  const cat = (App.imp.category || '').trim();
   if (!t && !b && !d) return;
   const c = ctx();
-  App.state = L.addImprovement(App.state, { text: t, body: b || null, depth: d || null }, c);
-  App.imp = { text: '', body: '', depth: '' };
+  App.state = L.addImprovement(App.state, { text: t, body: b || null, depth: d || null, category: cat || null }, c);
+  App.imp = { text: '', body: '', depth: '', category: '' };
   App.impAddOpen = false;
   saveStateDebounced(App.state); render();
 }
@@ -704,7 +726,7 @@ function submitImprovement() {
 function openImprovementEdit(id) {
   const it = App.state.items.find((i) => i.id === id);
   if (!it) return;
-  App.impEdit = { id, text: it.text || '', body: it.body || '', depth: it.depth || '' };
+  App.impEdit = { id, text: it.text || '', body: it.body || '', depth: it.depth || '', category: it.category || '' };
   render();
 }
 
@@ -714,6 +736,7 @@ function saveImprovementEdit() {
   const t = (e.text || '').trim();
   const b = (e.body || '').trim();
   const d = (e.depth || '').trim();
+  const cat = (e.category || '').trim();
   if (!t && !b && !d) { // helt tom → slett (til søppel)
     App.impEdit = null;
     commit(L.deleteItem(App.state, { id: e.id }, ctx()));
@@ -723,6 +746,7 @@ function saveImprovementEdit() {
   let next = L.setItemText(App.state, { id: e.id, text: e.text }, c);
   next = L.setItemBody(next, { id: e.id, body: b || null }, { now: c.now, id: newId() });
   next = L.setItemDepth(next, { id: e.id, depth: d || null }, { now: c.now, id: newId() });
+  next = L.setItemCategory(next, { id: e.id, category: cat || null }, { now: c.now, id: newId() });
   App.impEdit = null;
   App.state = next; saveStateDebounced(App.state); render();
 }
