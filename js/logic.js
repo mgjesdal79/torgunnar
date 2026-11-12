@@ -43,7 +43,7 @@ export function migrate(state, today) {
   // Manuell dra-og-slipp-rekkefølge på gjøremål/jobb: backfill order når feltet
   // mangler. Reproduser den gamle sorteringen (timede først, så nyeste) slik at
   // lista ser identisk ut ved første oppgradering – deretter er den manuell.
-  ['task', 'job'].forEach((tp) => {
+  ['task', 'job', 'someday'].forEach((tp) => {
     const list = out.items.filter((i) => i.type === tp && !i.removed);
     if (list.length && list.every((i) => i.order == null)) {
       list.sort((a, b) => {
@@ -722,11 +722,13 @@ export function promoteToToday(state, { id }, ctx) {
 
 export function mediumItems(state) {
   const rank = { nag: 0, nudge: 1, chill: 2 };
+  // Grupper fortsatt nag→nudge→chill; innen hver gruppe styrer manuell order
+  // (dra-og-slipp). byManualOrder legger order-løse (nylig fanget) øverst, nyeste først.
   return activeItems(state)
     .filter((i) => i.type === 'someday' && !i.done)
     .sort((a, b) =>
       rank[a.insistence || 'chill'] - rank[b.insistence || 'chill']
-      || (b.createdAt || '').localeCompare(a.createdAt || ''));
+      || byManualOrder(a, b));
 }
 
 export function mediumBadge(state, now) {
