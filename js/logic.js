@@ -765,11 +765,37 @@ export function mediumItems(state) {
 
 export function mediumBadge(state, now) {
   // Innboks-tilen er skjult, så forfalte «dult» (nudgeDue) må lyse herfra også,
-  // ellers strandes de. Teller nag + forfalte dult.
-  const n = activeItems(state)
-    .filter((i) => i.type === 'someday' && !i.done
-      && (i.insistence === 'nag' || nudgeDue(i, now))).length;
+  // ellers strandes de. Teller nag + forfalte dult – samme filter som mediumReadyItems.
+  const n = mediumReadyItems(state, now).length;
   return { count: n, level: n ? 'open' : 'calm' };
+}
+
+// «Klar nå»: det som krever deg nå = masete (nag) + forfalte dult (nudgeDue).
+// Identisk filter med mediumBadge, så seksjonstallet matcher alltid badgen.
+// Rekkefølge: masete først, så forfalte dult (mest forfalt / eldst resurfaceAt øverst).
+export function mediumReadyItems(state, now) {
+  return activeItems(state)
+    .filter((i) => i.type === 'someday' && !i.done
+      && (i.insistence === 'nag' || nudgeDue(i, now)))
+    .sort((a, b) => {
+      const an = a.insistence === 'nag' ? 0 : 1;
+      const bn = b.insistence === 'nag' ? 0 : 1;
+      if (an !== bn) return an - bn;
+      if (an === 1) return (a.resurfaceAt || '').localeCompare(b.resurfaceAt || ''); // eldst først
+      return byManualOrder(a, b);
+    });
+}
+
+// «Resten»: alt annet åpent someday. Kommende dult først, sortert på nærmeste
+// resurfaceAt (snart øverst), så chill (chill/null) etter eksisterende manuell order.
+export function mediumRestItems(state, now) {
+  const rest = activeItems(state)
+    .filter((i) => i.type === 'someday' && !i.done
+      && i.insistence !== 'nag' && !nudgeDue(i, now));
+  const upcoming = rest.filter((i) => i.insistence === 'nudge')
+    .sort((a, b) => (a.resurfaceAt || '').localeCompare(b.resurfaceAt || ''));
+  const chill = rest.filter((i) => i.insistence !== 'nudge').sort(byManualOrder);
+  return [...upcoming, ...chill];
 }
 
 export function improvementItems(state) {

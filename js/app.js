@@ -807,31 +807,35 @@ function daysUntil(iso) {
   return Math.max(0, Math.ceil(ms / 86400000));
 }
 
+function mediumMeta(it, now) {
+  if (it.insistence === 'nag') return '📣';
+  if (it.insistence === 'nudge') {
+    if (it.resurfaceAt && it.resurfaceAt <= now) return '👋';
+    if (it.resurfaceAt) return '👋 om ' + daysUntil(it.resurfaceAt) + ' d';
+    return '👋';
+  }
+  return '😴';
+}
+
 function mediumRowHtml(it) {
   if (isEditing(it.id)) return `<div class="trow editing" data-row-id="${it.id}">${editForm()}</div>`;
   const now = nowIso();
   const chk = `<span class="chk ${it.done ? 'on' : ''}" data-done="${it.id}"></span>`;
-  const meta = [];
-  if (it.insistence === 'nudge') {
-    if (it.resurfaceAt && it.resurfaceAt <= now) meta.push('👋 klar nå');
-    else if (it.resurfaceAt) meta.push('👋 om ' + daysUntil(it.resurfaceAt) + ' d');
-  }
-  const handle = `<span class="draghandle" data-draghandle="${it.id}" title="Dra for å flytte">⠿</span>`;
-  return `<div class="trow" data-row-id="${it.id}"><div class="row">${handle}${chk}`
+  const meta = mediumMeta(it, now);
+  return `<div class="trow" data-row-id="${it.id}"><div class="row">${chk}`
     + `<div class="rtxt" data-edit="${it.id}"><div class="t">${esc(it.text)}</div>`
-    + (meta.length ? `<div class="m">${esc(meta.join(' · '))}</div>` : '')
+    + (meta ? `<div class="m">${esc(meta)}</div>` : '')
     + `</div>`
     + `<button class="mini" data-promote="${it.id}">I dag</button></div></div>`;
 }
 
 function renderMedium() {
-  const items = L.mediumItems(App.state);
-  const groups = [['nag', '📣 Masete'], ['nudge', '👋 Dult'], ['chill', '😴 Chill']];
+  const now = nowIso();
+  const ready = L.mediumReadyItems(App.state, now);
+  const rest = L.mediumRestItems(App.state, now);
   let body = '';
-  groups.forEach(([key, label]) => {
-    const g = items.filter((i) => (i.insistence || 'chill') === key);
-    if (g.length) body += `<h2>${label}</h2><div class="card droplist" data-droplist="items">${g.map(mediumRowHtml).join('')}</div>`;
-  });
+  if (ready.length) body += `<h2>✨ Klar nå (${ready.length})</h2><div class="card">${ready.map(mediumRowHtml).join('')}</div>`;
+  if (rest.length) body += `<h2>📋 Resten</h2><div class="card">${rest.map(mediumRowHtml).join('')}</div>`;
   if (!body) body = `<p class="sub">Ingenting her ennå. Fang noe som «💛 Langsiktig».</p>`;
   return headerBar('💛 Langsiktig')
     + `<div class="body">`
