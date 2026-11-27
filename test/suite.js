@@ -1,4 +1,4 @@
-import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, jobItems, reorderItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, inactiveRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumReadyItems, mediumRestItems, mediumBadge, improvementItems, improvementCategories, improvementGroups, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, konaTrashItems, trashItems, restoreItem, purgeItem, purgeAllTrash, purgeAllKonaTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes } from '../js/logic.js';
+import { defaultState, clone, migrate, addItem, activeItems, classifyItem, setItemCategory, setItemText, setReminder, completeItem, reopenItem, deleteItem, deferItem, undeferItem, isResurfaced, isPending, inboxItems, itemsForToday, categoryItems, somedayItems, taskItems, jobItems, reorderItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, addCategory, updateCategory, deleteCategory, reorderCategories, categoryBadge, mergeState, pruneLog, addMinutesIso, weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, inactiveRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumReadyItems, mediumRestItems, mediumBadge, improvementItems, improvementCategories, improvementGroups, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, konaTrashItems, trashItems, restoreItem, purgeItem, purgeAllTrash, purgeAllKonaTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes, addFlowStep, setFlowStepText, setFlowStepOwner, removeFlowStep, ballOwner, toggleFlowStep, finishFlow, flowItems, doneFlowItems, reorderFlowSteps } from '../js/logic.js';
 const L = { weekdayKey, addDaysIso, addRoutine, updateRoutine, deleteRoutine, generateRoutineInstances, wakeRoutine, routineInstancesForDate, pruneRoutineInstances, sleepingRoutines, inactiveRoutines, allSubtasksDone, toggleRoutineSubtask, skipRoutineInstance, defaultState, mergeState, migrate, setInsistence, nudgeDue, snoozeNudge, promoteToToday, mediumItems, mediumReadyItems, mediumRestItems, mediumBadge, improvementItems, improvementCategories, improvementGroups, addImprovement, setItemBody, setItemDepth, reorderImprovement, renderMarkdown, isKonaPending, konaItems, konaBadge, konaTrashItems, taskItems, jobItems, reorderItems, deferredJobItems, noteItems, noteBadge, toggleNoteBadge, scheduleTask, markPushedToIos, buildShortcutUrl, setShortcutName, deleteItem, trashItems, restoreItem, purgeItem, purgeAllTrash, purgeAllKonaTrash, expireTrash, doneTaskItems, doneJobItems, doneSomedayItems, doneTodayItems, trashAllDone, DEFAULT_QUOTES, getQuotes, quoteForDay, currentQuote, rotateQuote, setQuotes };
 
 export function runTests() {
@@ -1230,5 +1230,122 @@ export function runTests() {
     eq(L.doneTaskItems(s).length, 0);
     eq(L.taskItems(s, now).map((i) => i.id), ['a']);
   });
+
+  // ---- Flyt (flerstegs-oppgaver) ----
+  t('addItem flow får tomt steps-array', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'Søke om Memoplanner', type: 'flow' }, { now: '2026-11-27T08:00:00Z', id: 'f1' });
+    const it = s.items[0];
+    eq(it.type, 'flow');
+    eq(it.steps, []);
+  });
+  t('classifyItem til flow gir tomt steps hvis det mangler', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'Bytt dekk' }, { now: '2026-11-27T08:00:00Z', id: 'a1' });
+    s = classifyItem(s, { id: 'a1', type: 'flow' }, { now: '2026-11-27T08:05:00Z', id: 'x' });
+    eq(s.items[0].type, 'flow');
+    eq(s.items[0].steps, []);
+  });
+  t('classifyItem bort fra flow nullstiller steps', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'X', type: 'flow' }, { now: '2026-11-27T08:00:00Z', id: 'f1' });
+    s = classifyItem(s, { id: 'f1', type: 'task' }, { now: '2026-11-27T08:05:00Z', id: 'x' });
+    eq(s.items[0].steps, null);
+  });
+
+  t('addFlowStep legger til steg med owner=meg som standard', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'Flyt', type: 'flow' }, { now: '2026-11-27T08:00:00Z', id: 'f1' });
+    s = addFlowStep(s, { id: 'f1', text: 'Ring fastlege' }, { now: '2026-11-27T08:01:00Z', id: 's1' });
+    const st = s.items[0].steps[0];
+    eq(st.text, 'Ring fastlege');
+    eq(st.owner, 'meg');
+    eq(st.done, false);
+    eq(st.id, 's1');
+  });
+  t('setFlowStepText + setFlowStepOwner endrer et steg', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'Flyt', type: 'flow' }, { now: '2026-11-27T08:00:00Z', id: 'f1' });
+    s = addFlowStep(s, { id: 'f1', text: 'A' }, { now: '2026-11-27T08:01:00Z', id: 's1' });
+    s = setFlowStepText(s, { id: 'f1', stepId: 's1', text: 'Vent på svar' }, { now: '2026-11-27T08:02:00Z', id: 'x' });
+    s = setFlowStepOwner(s, { id: 'f1', stepId: 's1', owner: 'ekstern' }, { now: '2026-11-27T08:03:00Z', id: 'x' });
+    eq(s.items[0].steps[0].text, 'Vent på svar');
+    eq(s.items[0].steps[0].owner, 'ekstern');
+  });
+  t('removeFlowStep fjerner steget', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'Flyt', type: 'flow' }, { now: '2026-11-27T08:00:00Z', id: 'f1' });
+    s = addFlowStep(s, { id: 'f1', text: 'A' }, { now: '2026-11-27T08:01:00Z', id: 's1' });
+    s = addFlowStep(s, { id: 'f1', text: 'B' }, { now: '2026-11-27T08:02:00Z', id: 's2' });
+    s = removeFlowStep(s, { id: 'f1', stepId: 's1' }, { now: '2026-11-27T08:03:00Z', id: 'x' });
+    eq(s.items[0].steps.length, 1);
+    eq(s.items[0].steps[0].id, 's2');
+  });
+
+  t('ballOwner er eier av første ukryssa steg', () => {
+    const flow = { type: 'flow', steps: [
+      { id: 's1', owner: 'meg', done: true },
+      { id: 's2', owner: 'ekstern', done: false },
+      { id: 's3', owner: 'meg', done: false },
+    ] };
+    eq(ballOwner(flow), 'ekstern');
+  });
+  t('ballOwner er meg når ingen åpne steg', () => {
+    eq(ballOwner({ type: 'flow', steps: [{ id: 's1', owner: 'ekstern', done: true }] }), 'meg');
+    eq(ballOwner({ type: 'flow', steps: [] }), 'meg');
+  });
+  t('toggleFlowStep auto-ferdig når siste steg hukes av', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'Flyt', type: 'flow' }, { now: '2026-11-27T08:00:00Z', id: 'f1' });
+    s = addFlowStep(s, { id: 'f1', text: 'A' }, { now: '2026-11-27T08:01:00Z', id: 's1' });
+    s = toggleFlowStep(s, { id: 'f1', stepId: 's1' }, { now: '2026-11-27T09:00:00Z', id: 'x' });
+    eq(s.items[0].steps[0].done, true);
+    eq(s.items[0].done, true);
+    eq(s.items[0].doneAt, '2026-11-27T09:00:00Z');
+  });
+  t('toggleFlowStep av igjen gjenåpner flyten', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'Flyt', type: 'flow' }, { now: '2026-11-27T08:00:00Z', id: 'f1' });
+    s = addFlowStep(s, { id: 'f1', text: 'A' }, { now: '2026-11-27T08:01:00Z', id: 's1' });
+    s = toggleFlowStep(s, { id: 'f1', stepId: 's1' }, { now: '2026-11-27T09:00:00Z', id: 'x' });
+    s = toggleFlowStep(s, { id: 'f1', stepId: 's1' }, { now: '2026-11-27T09:05:00Z', id: 'x' });
+    eq(s.items[0].steps[0].done, false);
+    eq(s.items[0].done, false);
+    eq(s.items[0].doneAt, null);
+  });
+  t('finishFlow avslutter tidlig selv med åpne steg', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'Flyt', type: 'flow' }, { now: '2026-11-27T08:00:00Z', id: 'f1' });
+    s = addFlowStep(s, { id: 'f1', text: 'A' }, { now: '2026-11-27T08:01:00Z', id: 's1' });
+    s = finishFlow(s, { id: 'f1' }, { now: '2026-11-27T10:00:00Z', id: 'x' });
+    eq(s.items[0].done, true);
+    eq(s.items[0].doneAt, '2026-11-27T10:00:00Z');
+  });
+
+  t('flowItems: din tur øverst, venter-på-andre under, kun aktive', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'A', type: 'flow' }, { now: '2026-11-27T08:00:00Z', id: 'A' });
+    s = addFlowStep(s, { id: 'A', text: 'a1' }, { now: '2026-11-27T08:00:01Z', id: 'as1' });
+    s = setFlowStepOwner(s, { id: 'A', stepId: 'as1', owner: 'ekstern' }, { now: '2026-11-27T08:00:02Z', id: 'x' });
+    s = addItem(s, { text: 'B', type: 'flow' }, { now: '2026-11-27T08:00:03Z', id: 'B' });
+    s = addFlowStep(s, { id: 'B', text: 'b1' }, { now: '2026-11-27T08:00:04Z', id: 'bs1' });
+    s = addItem(s, { text: 'C', type: 'flow' }, { now: '2026-11-27T08:00:05Z', id: 'C' });
+    s = finishFlow(s, { id: 'C' }, { now: '2026-11-27T08:00:06Z', id: 'x' });
+    eq(flowItems(s).map((i) => i.id), ['B', 'A']);
+    eq(doneFlowItems(s).map((i) => i.id), ['C']);
+  });
+  t('reorderFlowSteps endrer rekkefølgen', () => {
+    let s = defaultState();
+    s = addItem(s, { text: 'F', type: 'flow' }, { now: '2026-11-27T08:00:00Z', id: 'f1' });
+    s = addFlowStep(s, { id: 'f1', text: 'A' }, { now: '2026-11-27T08:00:01Z', id: 's1' });
+    s = addFlowStep(s, { id: 'f1', text: 'B' }, { now: '2026-11-27T08:00:02Z', id: 's2' });
+    s = reorderFlowSteps(s, { id: 'f1', orderedIds: ['s2', 's1'] }, { now: '2026-11-27T08:00:03Z', id: 'x' });
+    eq(s.items[0].steps.map((x) => x.id), ['s2', 's1']);
+  });
+  t('migrate backfiller steps=[] på gamle flow-items uten feltet', () => {
+    const s = migrate({ items: [{ id: 'f', type: 'flow', text: 'gammel' }] }, '2026-11-27');
+    eq(s.items[0].steps, []);
+  });
+
   return results;
 }

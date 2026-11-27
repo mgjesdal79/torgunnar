@@ -55,6 +55,10 @@ export function migrate(state, today) {
       list.forEach((it, i) => { it.order = i; });
     }
   });
+  // Flyt: backfill tomt steps-array på gamle flow-items uten feltet.
+  out.items.forEach((i) => {
+    if (i.type === 'flow' && !Array.isArray(i.steps)) i.steps = [];
+  });
   return out;
 }
 
@@ -70,6 +74,7 @@ export function addItem(state, { text, type = null, category = null, source = nu
     due: null, remindAt: null,
     resurfaceAt: null, deferred: false, iosPushedAt: null,
     source, routineId: null, routineDate: null, subtasks: null,
+    steps: type === 'flow' ? [] : null,
     insistence: null, cadenceDays: null,
     createdAt: ctx.now, updatedAt: ctx.now, removed: false,
   };
@@ -95,7 +100,81 @@ export function classifyItem(state, { id, type }, ctx) {
   return patchItem(state, id, (it) => {
     it.type = type;
     if (type === 'note') { it.due = null; it.remindAt = null; it.done = false; it.doneAt = null; }
+    if (type === 'flow') { if (!Array.isArray(it.steps)) it.steps = []; it.done = false; it.doneAt = null; }
+    else { it.steps = null; }
   }, ctx);
+}
+
+// ---- Flyt: flerstegs-oppgaver ----
+// Et flow-item har steps: [{ id, text, owner:'meg'|'ekstern', done }].
+function flowStepsOf(it) { return Array.isArray(it.steps) ? it.steps : []; }
+
+// Ball = eier av første ukryssa steg. Ingen åpne steg → «din tur» (meg).
+export function ballOwner(flow) {
+  const open = flowStepsOf(flow).find((s) => !s.done);
+  return open ? (open.owner === 'ekstern' ? 'ekstern' : 'meg') : 'meg';
+}
+function allFlowStepsDone(it) {
+  const steps = flowStepsOf(it);
+  return steps.length > 0 && steps.every((s) => s.done);
+}
+
+export function addFlowStep(state, { id, text }, ctx) {
+  return patchItem(state, id, (it) => {
+    if (!Array.isArray(it.steps)) it.steps = [];
+    it.steps.push({ id: ctx.id, text: String(text || '').trim(), owner: 'meg', done: false });
+  }, ctx);
+}
+export function setFlowStepText(state, { id, stepId, text }, ctx) {
+  return patchItem(state, id, (it) => {
+    const st = flowStepsOf(it).find((x) => x.id === stepId);
+    if (st) st.text = String(text || '').trim();
+  }, ctx);
+}
+export function setFlowStepOwner(state, { id, stepId, owner }, ctx) {
+  return patchItem(state, id, (it) => {
+    const st = flowStepsOf(it).find((x) => x.id === stepId);
+    if (st) st.owner = owner === 'ekstern' ? 'ekstern' : 'meg';
+  }, ctx);
+}
+export function removeFlowStep(state, { id, stepId }, ctx) {
+  return patchItem(state, id, (it) => {
+    it.steps = flowStepsOf(it).filter((x) => x.id !== stepId);
+  }, ctx);
+}
+export function toggleFlowStep(state, { id, stepId }, ctx) {
+  return patchItem(state, id, (it) => {
+    const st = flowStepsOf(it).find((x) => x.id === stepId);
+    if (!st) return;
+    st.done = !st.done;
+    it.done = allFlowStepsDone(it);
+    it.doneAt = it.done ? ctx.now : null;
+  }, ctx);
+}
+export function finishFlow(state, { id }, ctx) {
+  return patchItem(state, id, (it) => { it.done = true; it.doneAt = ctx.now; }, ctx);
+}
+export function reorderFlowSteps(state, { id, orderedIds }, ctx) {
+  return patchItem(state, id, (it) => {
+    const byId = {};
+    flowStepsOf(it).forEach((s) => { byId[s.id] = s; });
+    it.steps = orderedIds.map((sid) => byId[sid]).filter(Boolean);
+  }, ctx);
+}
+
+// Aktive flyter: «din tur» øverst, «venter på andre» under, eldst først innen hver.
+export function flowItems(state) {
+  const list = activeItems(state).filter((i) => i.type === 'flow' && !i.done);
+  const rank = (i) => (ballOwner(i) === 'meg' ? 0 : 1);
+  return list.sort((a, b) => {
+    const r = rank(a) - rank(b);
+    if (r !== 0) return r;
+    return (a.createdAt || '').localeCompare(b.createdAt || '');
+  });
+}
+export function doneFlowItems(state) {
+  return activeItems(state).filter((i) => i.type === 'flow' && i.done)
+    .sort((a, b) => (b.doneAt || '').localeCompare(a.doneAt || ''));
 }
 
 export function setItemCategory(state, { id, category }, ctx) {
