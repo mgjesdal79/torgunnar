@@ -172,6 +172,20 @@
   .wdrow{display:flex;flex-wrap:wrap;gap:6px}
   .progbar{height:4px;border-radius:3px;background:var(--line);margin:0 2px 8px;overflow:hidden}
   .progbar>i{display:block;height:100%;background:var(--bamboo)}
+  /* Flyt (🔀) */
+  .card.flowcard{padding:2px 14px 10px}
+  .flowcard .rhead .caret{color:var(--faint);transition:transform .15s ease;display:inline-block}
+  .flowcard .rhead.open .caret{transform:rotate(180deg);color:var(--bamboo)}
+  .flowcard .flowsub{margin:0 2px 6px;font-size:12px;color:var(--dim)}
+  .flowaddrow{gap:8px;padding:6px 0 2px}
+  .chip.owner{padding:6px 9px;font-size:13px;line-height:1}
+  .chip.owner.on{background:var(--blue);border-color:var(--blue);color:#04131f}
+  .ball{flex:none;font-size:11px;font-weight:700;border-radius:999px;padding:3px 9px;white-space:nowrap}
+  .ball.meg{background:var(--bamboo);color:#06220d}
+  .ball.ekstern{background:var(--surface2);color:var(--dim);border:1px solid var(--line)}
+  h3.flowgroup{color:var(--dim);font-size:13px;font-weight:700;margin:14px 2px 6px}
+  .row.flownav{cursor:pointer}
+  .row.flownav .t{font-weight:600}
   /* Forbedring (🌱) */
   .card.improvement{padding:2px 14px 12px}
   /* Samle forbedringene i en kategori i ett felles kort med tynne skillelinjer */

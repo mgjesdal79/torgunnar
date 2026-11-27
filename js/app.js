@@ -13,6 +13,7 @@ const App = {
   rowOpen: {},
   doneRtnOpen: false,
   konaTrashOpen: false,
+  flowOpen: {}, flowFocus: null, doneFlowOpen: false,
 };
 
 function ctx() { return { now: nowIso(), id: newId() }; }
@@ -55,6 +56,7 @@ function renderHome() {
   const tiles = tileHtml('✅', 'Gjøremål', { count: taskN, level: taskN ? 'open' : 'calm' }, 'data-view="tasks"')
     + tileHtml('💼', 'Jobb', { count: jobN, level: jobN ? 'open' : 'calm' }, 'data-view="job"')
     + tileHtml('💛', 'Langsiktig', mediumN, 'data-view="medium"')
+    + tileHtml('🔀', 'Flyt', null, 'data-view="flow"', L.flowItems(App.state).length ? String(L.flowItems(App.state).length) : '')
     + tileHtml('📝', 'Notater', L.noteBadge(App.state), 'data-view="notes"')
     + tileHtml('🌱', 'Forbedring', null, 'data-view="improvements"')
     + tileHtml('💬', 'Ingrid', konaN, 'data-view="kona"')
@@ -81,6 +83,7 @@ function render() {
   else if (v === 'tasks') root.innerHTML = renderTasks();
   else if (v === 'job') root.innerHTML = renderJob();
   else if (v === 'medium') root.innerHTML = renderMedium();
+  else if (v === 'flow') root.innerHTML = renderFlow();
   else if (v === 'notes') root.innerHTML = renderNotes();
   else if (v === 'improvements') root.innerHTML = renderImprovements();
   else if (v === 'kona') root.innerHTML = renderKona();
@@ -244,6 +247,49 @@ function bind(root) {
       if (!App.rowOpen[id] && isTimeEditing(id)) App.timeEdit = null;
       render();
     });
+  // --- Flyt (🔀) ---
+  root.querySelectorAll('[data-flowtoggle]').forEach((el) =>
+    el.onclick = () => { const id = el.dataset.flowtoggle; App.flowOpen[id] = !App.flowOpen[id]; render(); });
+  root.querySelectorAll('[data-flowstep]').forEach((el) =>
+    el.onclick = () => {
+      const [id, stepId] = el.dataset.flowstep.split('|');
+      commit(L.toggleFlowStep(App.state, { id, stepId }, ctx()));
+    });
+  root.querySelectorAll('[data-flowowner]').forEach((el) =>
+    el.onclick = () => {
+      const [id, stepId, owner] = el.dataset.flowowner.split('|');
+      commit(L.setFlowStepOwner(App.state, { id, stepId, owner }, ctx()));
+    });
+  root.querySelectorAll('[data-flowtext]').forEach((el) =>
+    el.onchange = () => {
+      const [id, stepId] = el.dataset.flowtext.split('|');
+      commit(L.setFlowStepText(App.state, { id, stepId, text: el.value }, ctx()));
+    });
+  root.querySelectorAll('[data-flowstepdel]').forEach((el) =>
+    el.onclick = () => {
+      const [id, stepId] = el.dataset.flowstepdel.split('|');
+      commit(L.removeFlowStep(App.state, { id, stepId }, ctx()));
+    });
+  const flowAdd = (id, text) => {
+    const t = (text || '').trim();
+    if (!t) return;
+    App.flowOpen[id] = true;
+    commit(L.addFlowStep(App.state, { id, text: t }, ctx()));
+  };
+  root.querySelectorAll('[data-flowaddbtn]').forEach((el) =>
+    el.onclick = () => {
+      const id = el.dataset.flowaddbtn;
+      const inp = root.querySelector(`[data-flowaddinput="${id}"]`);
+      flowAdd(id, inp && inp.value);
+    });
+  root.querySelectorAll('[data-flowaddinput]').forEach((el) =>
+    el.onkeydown = (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); flowAdd(el.dataset.flowaddinput, el.value); } });
+  root.querySelectorAll('[data-flowfinish]').forEach((el) =>
+    el.onclick = () => { if (confirm('Avslutte denne flyten?')) commit(L.finishFlow(App.state, { id: el.dataset.flowfinish }, ctx())); });
+  root.querySelectorAll('[data-flownav]').forEach((el) =>
+    el.onclick = () => { App.flowFocus = el.dataset.flownav; App.view = 'flow'; render(); });
+  root.querySelectorAll('[data-doneflowtoggle]').forEach((el) =>
+    el.onclick = () => { App.doneFlowOpen = !App.doneFlowOpen; render(); });
   bindDrag(root);
   const ssSave = root.querySelector('#setShortcutSave');
   if (ssSave) ssSave.onclick = () => {
@@ -336,6 +382,11 @@ function onDrop(kind, orderedIds) {
     renderRoutineEditor();
     return;
   }
+  if (kind && kind.indexOf('flowsteps:') === 0) {
+    const id = kind.slice('flowsteps:'.length);
+    commit(L.reorderFlowSteps(App.state, { id, orderedIds }, ctx()));
+    return;
+  }
   // Standard: ekte items med order-felt (gjøremål/jobb/langsiktig/forbedring).
   commit(L.reorderItems(App.state, { orderedIds }, ctx()));
 }
@@ -345,6 +396,7 @@ const EDIT_TYPES = [
   { id: 'task', label: '✅ Gjøremål' },
   { id: 'job', label: '💼 Jobb' },
   { id: 'someday', label: '💛 Langsiktig' },
+  { id: 'flow', label: '🔀 Flyt' },
   { id: 'note', label: '📝 Notat' },
 ];
 // Valg i «Fang en tanke» = typene + Ingrid (sender tanken til Ingrid-lista).
@@ -413,7 +465,7 @@ function submitCapture() {
                            { now: c.now, id: newId() });
   }
   reset();
-  if (!stay) App.view = { task: 'tasks', job: 'job', someday: 'medium', note: 'notes' }[choice] || 'tasks';
+  if (!stay) App.view = { task: 'tasks', job: 'job', someday: 'medium', note: 'notes', flow: 'flow' }[choice] || 'tasks';
   App.state = next; saveStateDebounced(App.state); render();
 }
 
@@ -423,7 +475,7 @@ function isEditing(id) { return App.edit && App.edit.id === id; }
 function openEdit(id) {
   const it = App.state.items.find((i) => i.id === id);
   if (!it) return;
-  const type = ['task', 'job', 'someday', 'note'].includes(it.type) ? it.type : 'task';
+  const type = ['task', 'job', 'someday', 'note', 'flow'].includes(it.type) ? it.type : 'task';
   App.edit = { id, text: it.text || '', type,
                insistence: it.insistence || 'chill', cadenceDays: it.cadenceDays || 7 };
   render();
@@ -568,7 +620,22 @@ function renderTasks() {
   return headerBar('✅ Gjøremål')
     + `<div class="body">`
     + captureBlock({ fixedType: 'task', placeholder: 'Nytt gjøremål…' })
-    + body + doneSection(L.doneTaskItems(App.state)) + `</div>`;
+    + body + flowNavGroup() + doneSection(L.doneTaskItems(App.state)) + `</div>`;
+}
+
+// Flyt-ene vises også i Gjøremål som navigeringsrader (ingen checkbox) – gir
+// Gjøremål «totalen». Trykk hopper inn i flyten (ekspandert) under Flyt-flisen.
+function flowNavGroup() {
+  const flows = L.flowItems(App.state);
+  if (!flows.length) return '';
+  const rows = flows.map((f) => {
+    const ball = L.ballOwner(f) === 'meg'
+      ? `<span class="ball meg">din tur</span>`
+      : `<span class="ball ekstern">venter</span>`;
+    return `<div class="row flownav" data-flownav="${f.id}">`
+      + `<div class="rtxt"><div class="t">🔀 ${esc(f.text)}</div></div>${ball}</div>`;
+  }).join('');
+  return `<h3 class="flowgroup">Flyt</h3><div class="card">${rows}</div>`;
 }
 
 function deferredJobRowHtml(it) {
@@ -879,6 +946,59 @@ function renderKona() {
     + list + trashSec + `</div>`;
 }
 
+
+// --- Flyt (🔀): flerstegs-oppgaver med ball-indikator ---
+function flowCardHtml(f) {
+  const open = !!App.flowOpen[f.id];
+  const ball = L.ballOwner(f) === 'meg'
+    ? `<span class="ball meg">din tur</span>`
+    : `<span class="ball ekstern">venter på andre</span>`;
+  const steps = f.steps || [];
+  const openStep = steps.find((s) => !s.done);
+  const head = `<div class="rhead ${open ? 'open' : ''}" data-flowtoggle="${f.id}">`
+    + `<span class="t">${esc(f.text)}</span>${ball}<span class="caret">⌄</span></div>`
+    + (open ? '' : `<div class="sub flowsub">${esc(openStep ? openStep.text : 'Ingen steg ennå')}</div>`);
+  if (!open) return `<div class="card flowcard">${head}</div>`;
+  const rows = steps.map((s) =>
+    `<div class="trow subrow" data-row-id="${s.id}"><div class="row">`
+    + `<span class="draghandle" data-draghandle="${s.id}" title="Dra for å flytte">⠿</span>`
+    + `<span class="chk ${s.done ? 'on' : ''}" data-flowstep="${f.id}|${s.id}"></span>`
+    + `<input class="inp" style="margin:0" data-flowtext="${f.id}|${s.id}" value="${esc(s.text)}" placeholder="Steg…">`
+    + `<span class="chip owner ${s.owner === 'meg' ? 'on' : ''}" data-flowowner="${f.id}|${s.id}|meg" title="Min tur">🙋</span>`
+    + `<span class="chip owner ${s.owner === 'ekstern' ? 'on' : ''}" data-flowowner="${f.id}|${s.id}|ekstern" title="Venter på andre">📨</span>`
+    + `<button class="mini" data-flowstepdel="${f.id}|${s.id}">✕</button>`
+    + `</div></div>`).join('');
+  const detail = `<div class="rbody"><div class="subdrop" data-droplist="flowsteps:${f.id}">${rows}</div>`
+    + `<div class="row flowaddrow"><input class="inp" style="margin:0" data-flowaddinput="${f.id}" placeholder="+ nytt steg…">`
+    + `<button class="mini" data-flowaddbtn="${f.id}">Legg til</button></div>`
+    + `<div class="impacts"><button class="mini danger" data-flowfinish="${f.id}">Avslutt flyt</button></div></div>`;
+  return `<div class="card flowcard">${head}${detail}</div>`;
+}
+
+function doneFlowRowHtml(f) {
+  return `<div class="row"><div class="rtxt done"><div class="t">${esc(f.text)}</div></div>`
+    + `<button class="mini" data-reopen="${f.id}">Hent frem</button></div>`;
+}
+
+function renderFlow() {
+  if (App.flowFocus) { App.flowOpen[App.flowFocus] = true; App.flowFocus = null; }
+  const items = L.flowItems(App.state);
+  const body = items.length
+    ? items.map(flowCardHtml).join('')
+    : `<p class="sub">Ingen flyter nå 🌱 Gjør en oppgave om til en flyt når den har flere steg.</p>`;
+  const done = L.doneFlowItems(App.state);
+  let doneSec = '';
+  if (done.length) {
+    const o = App.doneFlowOpen;
+    doneSec = `<h2 class="collapse ${o ? 'open' : ''}" data-doneflowtoggle="1">`
+      + `✓ Fullførte (${done.length}) <span class="caret">⌄</span></h2>`
+      + (o ? `<div class="card">${done.map(doneFlowRowHtml).join('')}</div>` : '');
+  }
+  return headerBar('🔀 Flyt')
+    + `<div class="body">`
+    + captureBlock({ fixedType: 'flow', placeholder: 'Ny flyt…' })
+    + body + doneSec + `</div>`;
+}
 
 function instCardHtml(inst) {
   const subs = inst.subtasks || [];
