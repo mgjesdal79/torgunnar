@@ -176,10 +176,13 @@
   .card.flowcard{padding:2px 14px 10px;border-left:3px solid transparent}
   .card.flowcard.mine{border-left-color:var(--bamboo)}
   .card.flowcard.waiting{border-left-color:var(--line);opacity:.74}
-  .flowcard .rhead .caret{color:var(--faint);transition:transform .15s ease;display:inline-block}
+  .flowcard .rhead .caret{color:var(--faint);transition:transform .15s ease;display:inline-block;flex:none}
   .flowcard .rhead.open .caret{transform:rotate(180deg);color:var(--bamboo)}
-  /* Neste steg – tydelig egen linje under tittelen */
-  .flownext{margin:0 2px 8px;font-size:14px;font-weight:600;color:var(--ink);line-height:1.35}
+  .flowmain{flex:1;min-width:0}
+  /* Flyt-navnet er sekundært – lite og dempet */
+  .flowname{font-size:12px;font-weight:600;color:var(--dim);margin:0 0 1px}
+  /* Neste steg (todoen) er det prominente */
+  .flownext{margin:1px 0 0;font-size:15px;font-weight:700;color:var(--ink);line-height:1.35}
   .flownext .arr{color:var(--bamboo);margin-right:2px}
   .flowcard.waiting .flownext{color:var(--dim);font-weight:500}
   .flowcard.waiting .flownext .arr{color:var(--faint)}
@@ -241,7 +244,7 @@
   window.SUPABASE_ANON_KEY = 'sb_publishable_iUwAfMrw1Ckrxbf1ZDLINA_xKUGyscg'; // publishable (public-safe)
 </script>
 <script type="module">
-  window.APP_VERSION = '40';
+  window.APP_VERSION = '41';
   window.APP_BUILD = '2026-11-27';
   const b = document.getElementById('build');
   if (b) b.textContent = 'build ' + window.APP_VERSION + ' · ' + window.APP_BUILD;

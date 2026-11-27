@@ -634,9 +634,12 @@ function flowNavGroup() {
       ? `<span class="ball meg">din tur</span>`
       : `<span class="ball ekstern">venter</span>`;
     const openStep = (f.steps || []).find((s) => !s.done);
-    const next = openStep ? `<div class="m">➡ ${openStep.owner === 'ekstern' ? '📨' : '🙋'} ${esc(openStep.text)}</div>` : '';
+    const main = openStep
+      ? `<div class="t">➡ ${openStep.owner === 'ekstern' ? '📨' : '🙋'} ${esc(openStep.text)}</div>`
+        + `<div class="m flowname-sm">🔀 ${esc(f.text)}</div>`
+      : `<div class="t">🔀 ${esc(f.text)}</div>`;
     return `<div class="row flownav ${mine ? 'mine' : 'waiting'}" data-flownav="${f.id}">`
-      + `<div class="rtxt"><div class="t">🔀 ${esc(f.text)}</div>${next}</div>${ball}</div>`;
+      + `<div class="rtxt">${main}</div>${ball}</div>`;
   }).join('');
   return `<h3 class="flowgroup">Flyt</h3><div class="card">${rows}</div>`;
 }
@@ -962,10 +965,11 @@ function flowCardHtml(f) {
   const nextLine = openStep
     ? `<div class="flownext"><span class="arr">➡</span> ${openStep.owner === 'ekstern' ? '📨' : '🙋'} ${esc(openStep.text)}</div>`
     : `<div class="flownext empty">Ingen steg ennå</div>`;
+  const name = `<div class="flowname">🔀 ${esc(f.text)}</div>`;
   const cls = `card flowcard ${mine ? 'mine' : 'waiting'}`;
   const head = `<div class="rhead ${open ? 'open' : ''}" data-flowtoggle="${f.id}">`
-    + `<span class="t">${esc(f.text)}</span>${ball}<span class="caret">⌄</span></div>`
-    + (open ? '' : nextLine);
+    + `<div class="flowmain">${name}${open ? '' : nextLine}</div>`
+    + `${ball}<span class="caret">⌄</span></div>`;
   if (!open) return `<div class="${cls}">${head}</div>`;
   const rows = steps.map((s) =>
     `<div class="trow subrow" data-row-id="${s.id}"><div class="row">`
