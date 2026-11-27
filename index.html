@@ -173,10 +173,17 @@
   .progbar{height:4px;border-radius:3px;background:var(--line);margin:0 2px 8px;overflow:hidden}
   .progbar>i{display:block;height:100%;background:var(--bamboo)}
   /* Flyt (🔀) */
-  .card.flowcard{padding:2px 14px 10px}
+  .card.flowcard{padding:2px 14px 10px;border-left:3px solid transparent}
+  .card.flowcard.mine{border-left-color:var(--bamboo)}
+  .card.flowcard.waiting{border-left-color:var(--line);opacity:.74}
   .flowcard .rhead .caret{color:var(--faint);transition:transform .15s ease;display:inline-block}
   .flowcard .rhead.open .caret{transform:rotate(180deg);color:var(--bamboo)}
-  .flowcard .flowsub{margin:0 2px 6px;font-size:12px;color:var(--dim)}
+  /* Neste steg – tydelig egen linje under tittelen */
+  .flownext{margin:0 2px 8px;font-size:14px;font-weight:600;color:var(--ink);line-height:1.35}
+  .flownext .arr{color:var(--bamboo);margin-right:2px}
+  .flowcard.waiting .flownext{color:var(--dim);font-weight:500}
+  .flowcard.waiting .flownext .arr{color:var(--faint)}
+  .flownext.empty{color:var(--faint);font-weight:500;font-style:italic}
   .flowaddrow{gap:8px;padding:6px 0 2px}
   .chip.owner{padding:6px 9px;font-size:13px;line-height:1}
   .chip.owner.on{background:var(--blue);border-color:var(--blue);color:#04131f}
@@ -186,6 +193,8 @@
   h3.flowgroup{color:var(--dim);font-size:13px;font-weight:700;margin:14px 2px 6px}
   .row.flownav{cursor:pointer}
   .row.flownav .t{font-weight:600}
+  .row.flownav .m{font-size:12px;color:var(--dim);margin-top:2px}
+  .row.flownav.waiting{opacity:.74}
   /* Forbedring (🌱) */
   .card.improvement{padding:2px 14px 12px}
   /* Samle forbedringene i en kategori i ett felles kort med tynne skillelinjer */
@@ -232,7 +241,7 @@
   window.SUPABASE_ANON_KEY = 'sb_publishable_iUwAfMrw1Ckrxbf1ZDLINA_xKUGyscg'; // publishable (public-safe)
 </script>
 <script type="module">
-  window.APP_VERSION = '39';
+  window.APP_VERSION = '40';
   window.APP_BUILD = '2026-11-27';
   const b = document.getElementById('build');
   if (b) b.textContent = 'build ' + window.APP_VERSION + ' · ' + window.APP_BUILD;

@@ -629,11 +629,14 @@ function flowNavGroup() {
   const flows = L.flowItems(App.state);
   if (!flows.length) return '';
   const rows = flows.map((f) => {
-    const ball = L.ballOwner(f) === 'meg'
+    const mine = L.ballOwner(f) === 'meg';
+    const ball = mine
       ? `<span class="ball meg">din tur</span>`
       : `<span class="ball ekstern">venter</span>`;
-    return `<div class="row flownav" data-flownav="${f.id}">`
-      + `<div class="rtxt"><div class="t">🔀 ${esc(f.text)}</div></div>${ball}</div>`;
+    const openStep = (f.steps || []).find((s) => !s.done);
+    const next = openStep ? `<div class="m">➡ ${openStep.owner === 'ekstern' ? '📨' : '🙋'} ${esc(openStep.text)}</div>` : '';
+    return `<div class="row flownav ${mine ? 'mine' : 'waiting'}" data-flownav="${f.id}">`
+      + `<div class="rtxt"><div class="t">🔀 ${esc(f.text)}</div>${next}</div>${ball}</div>`;
   }).join('');
   return `<h3 class="flowgroup">Flyt</h3><div class="card">${rows}</div>`;
 }
@@ -950,15 +953,20 @@ function renderKona() {
 // --- Flyt (🔀): flerstegs-oppgaver med ball-indikator ---
 function flowCardHtml(f) {
   const open = !!App.flowOpen[f.id];
-  const ball = L.ballOwner(f) === 'meg'
+  const mine = L.ballOwner(f) === 'meg';
+  const ball = mine
     ? `<span class="ball meg">din tur</span>`
     : `<span class="ball ekstern">venter på andre</span>`;
   const steps = f.steps || [];
   const openStep = steps.find((s) => !s.done);
+  const nextLine = openStep
+    ? `<div class="flownext"><span class="arr">➡</span> ${openStep.owner === 'ekstern' ? '📨' : '🙋'} ${esc(openStep.text)}</div>`
+    : `<div class="flownext empty">Ingen steg ennå</div>`;
+  const cls = `card flowcard ${mine ? 'mine' : 'waiting'}`;
   const head = `<div class="rhead ${open ? 'open' : ''}" data-flowtoggle="${f.id}">`
     + `<span class="t">${esc(f.text)}</span>${ball}<span class="caret">⌄</span></div>`
-    + (open ? '' : `<div class="sub flowsub">${esc(openStep ? openStep.text : 'Ingen steg ennå')}</div>`);
-  if (!open) return `<div class="card flowcard">${head}</div>`;
+    + (open ? '' : nextLine);
+  if (!open) return `<div class="${cls}">${head}</div>`;
   const rows = steps.map((s) =>
     `<div class="trow subrow" data-row-id="${s.id}"><div class="row">`
     + `<span class="draghandle" data-draghandle="${s.id}" title="Dra for å flytte">⠿</span>`
@@ -972,7 +980,7 @@ function flowCardHtml(f) {
     + `<div class="row flowaddrow"><input class="inp" style="margin:0" data-flowaddinput="${f.id}" placeholder="+ nytt steg…">`
     + `<button class="mini" data-flowaddbtn="${f.id}">Legg til</button></div>`
     + `<div class="impacts"><button class="mini danger" data-flowfinish="${f.id}">Avslutt flyt</button></div></div>`;
-  return `<div class="card flowcard">${head}${detail}</div>`;
+  return `<div class="${cls}">${head}${detail}</div>`;
 }
 
 function doneFlowRowHtml(f) {
